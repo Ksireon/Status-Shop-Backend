@@ -1,0 +1,109 @@
+{
+  "info": {
+    "name": "Status Shop API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "c7f9f3e2-2a8f-4f63-9b1f-b5c953c23342",
+    "description": "Сборник запросов для NestJS+Supabase"
+  },
+  "item": [
+    {
+      "name": "Auth / Register",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "http://localhost:3002/api/v1/auth/register", "host": ["http://localhost"], "port": "3002", "path": ["api","v1","auth","register"] },
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"test.user@example.com\",\n  \"password\": \"Secret123\",\n  \"name\": \"Test\",\n  \"surname\": \"User\"\n}" }
+      }
+    },
+    {
+      "name": "Auth / Login",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "http://localhost:3002/api/v1/auth/login", "host": ["http://localhost"], "port": "3002", "path": ["api","v1","auth","login"] },
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"test.user@example.com\",\n  \"password\": \"Secret123\"\n}" }
+      }
+    },
+    {
+      "name": "Users / Get",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": { "raw": "http://localhost:3002/api/v1/users/{{uid}}", "host": ["http://localhost"], "port": "3002", "path": ["api","v1","users","{{uid}}"] }
+      }
+    },
+    {
+      "name": "Users / Update",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "http://localhost:3002/api/v1/users/{{uid}}", "host": ["http://localhost"], "port": "3002", "path": ["api","v1","users","{{uid}}"] },
+        "body": { "mode": "raw", "raw": "{\n  \"city\": \"Tashkent\"\n}" }
+      }
+    },
+    {
+      "name": "Cart / List",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": { "raw": "http://localhost:3002/api/v1/users/{{uid}}/cart", "host": ["http://localhost"], "port": "3002", "path": ["api","v1","users","{{uid}}","cart"] }
+      }
+    },
+    {
+      "name": "Cart / Add",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "http://localhost:3002/api/v1/users/{{uid}}/cart", "host": ["http://localhost"], "port": "3002", "path": ["api","v1","users","{{uid}}","cart"] },
+        "body": { "mode": "raw", "raw": "{\n  \"name\": { \"ru\": \"Товар\", \"en\": \"Product\", \"uz\": \"Mahsulot\" },\n  \"description\": { \"ru\": \"Описание\", \"en\": \"Description\", \"uz\": \"Tavsif\" },\n  \"type\": \"roll\",\n  \"image\": \"https://example.com/img.png\",\n  \"color\": \"red\",\n  \"price\": 10.5,\n  \"quantity\": 2,\n  \"meters\": 5,\n  \"size\": \"M\",\n  \"total\": 21,\n  \"tag\": \"item1\"\n}" }
+      }
+    },
+    {
+      "name": "Cart / Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": { "raw": "http://localhost:3002/api/v1/users/{{uid}}/cart/{{tag}}", "host": ["http://localhost"], "port": "3002", "path": ["api","v1","users","{{uid}}","cart","{{tag}}"] }
+      }
+    },
+    {
+      "name": "Orders / Create",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "http://localhost:3002/api/v1/orders", "host": ["http://localhost"], "port": "3002", "path": ["api","v1","orders"] },
+        "body": { "mode": "raw", "raw": "{\n  \"uid\": \"{{uid}}\",\n  \"email\": \"test.user@example.com\",\n  \"name\": \"Test\",\n  \"phone\": \"+998900000000\",\n  \"branch\": \"Main\",\n  \"branch_key\": \"main\",\n  \"branch_address\": \"Some address\",\n  \"delivery_type\": \"pickup\",\n  \"payment_method\": \"cash\",\n  \"total\": 21,\n  \"items\": [ { \n    \"name\": { \"ru\": \"Товар\", \"en\": \"Product\", \"uz\": \"Mahsulot\" },\n    \"description\": { \"ru\": \"Описание\", \"en\": \"Description\", \"uz\": \"Tavsif\" },\n    \"type\": \"roll\",\n    \"image\": \"https://example.com/img.png\",\n    \"color\": \"red\",\n    \"price\": 10.5,\n    \"quantity\": 2,\n    \"meters\": 5,\n    \"size\": \"M\",\n    \"total\": 21,\n    \"tag\": \"item1\"\n  } ]\n}" }
+      }
+    },
+    {
+      "name": "Orders / List by user",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": { "raw": "http://localhost:3002/api/v1/users/{{uid}}/orders", "host": ["http://localhost"], "port": "3002", "path": ["api","v1","users","{{uid}}","orders"] }
+      }
+    },
+    {
+      "name": "Orders / Update status",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "http://localhost:3002/api/v1/orders/{{orderId}}", "host": ["http://localhost"], "port": "3002", "path": ["api","v1","orders","{{orderId}}"] },
+        "body": { "mode": "raw", "raw": "{\n  \"status\": \"processing\"\n}" }
+      }
+    },
+    {
+      "name": "Products / List",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "http://localhost:3002/api/v1/products", "host": ["http://localhost"], "port": "3002", "path": ["api","v1","products"] }
+      }
+    }
+  ],
+  "variable": [
+    { "key": "token", "value": "" },
+    { "key": "uid", "value": "" },
+    { "key": "orderId", "value": "" },
+    { "key": "tag", "value": "item1" }
+  ]
+}
