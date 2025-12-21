@@ -6,7 +6,7 @@ export class HealthController {
   constructor(private readonly supabase: SupabaseService) {}
   @Get()
   async check() {
-    const { error } = await this.supabase.admin.from('users').select('id').limit(1)
+    const { error } = await this.supabase.admin.from('profiles').select('id').limit(1)
     return { ok: !error }
   }
 }

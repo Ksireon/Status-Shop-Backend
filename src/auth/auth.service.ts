@@ -8,8 +8,9 @@ export class AuthService {
   constructor(private readonly supabase: SupabaseService) {}
 
   async register(dto: RegisterDto) {
+    const email = dto.email.toLowerCase()
     const { data: created, error } = await this.supabase.admin.auth.admin.createUser({
-      email: dto.email,
+      email,
       password: dto.password,
       email_confirm: true,
       user_metadata: {
@@ -24,7 +25,7 @@ export class AuthService {
     if (error || !created.user) throw new UnauthorizedException('Cannot create user')
     const profile = {
       id: created.user.id,
-      email: dto.email,
+      email,
       name: dto.name,
       surname: dto.surname,
       company: dto.company ?? null,
@@ -38,7 +39,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const { data, error } = await this.supabase.anon.auth.signInWithPassword({ email: dto.email, password: dto.password })
+    const { data, error } = await this.supabase.admin.auth.signInWithPassword({ email: dto.email.toLowerCase(), password: dto.password })
     if (error || !data.session) throw new UnauthorizedException('Invalid credentials')
     const token = data.session.access_token
     const { data: profile } = await this.supabase.admin
