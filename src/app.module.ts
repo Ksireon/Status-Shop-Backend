@@ -9,6 +9,7 @@ import { CartModule } from './cart/cart.module'
 import { OrdersModule } from './orders/orders.module'
 import { ProductsModule } from './products/products.module'
 import { HealthModule } from './health/health.module'
+import { SystemModule } from './system/system.module'
 
 @Module({
   imports: [
@@ -20,7 +21,8 @@ import { HealthModule } from './health/health.module'
     CartModule,
     OrdersModule,
     ProductsModule,
-    HealthModule
+    HealthModule,
+    SystemModule
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }]
 })
