@@ -36,4 +36,3 @@ export class BranchesController {
     return this.service.remove(id)
   }
 }
-

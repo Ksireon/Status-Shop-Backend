@@ -10,6 +10,7 @@ import { OrdersModule } from './orders/orders.module'
 import { ProductsModule } from './products/products.module'
 import { HealthModule } from './health/health.module'
 import { BranchesModule } from './branches/branches.module'
+import { SystemModule } from './system/system.module'
 
 @Module({
   imports: [
@@ -22,7 +23,8 @@ import { BranchesModule } from './branches/branches.module'
     OrdersModule,
     ProductsModule,
     HealthModule,
-    BranchesModule
+    BranchesModule,
+    SystemModule
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }]
 })
