@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common'
+import { Body, Controller, Get, Post, Query } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { ProductsService } from './products.service'
 
@@ -13,5 +13,9 @@ export class ProductsController {
     const s = sort || 'created_at'
     const o = order === 'desc' ? 'desc' : 'asc'
     return this.service.list({ page: p, limit: l, sort: s, order: o })
+  }
+  @Post()
+  create(@Body() body: any) {
+    return this.service.create(body)
   }
 }

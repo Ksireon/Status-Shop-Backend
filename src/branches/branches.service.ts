@@ -13,7 +13,7 @@ export class BranchesService {
     const { data, error } = await this.supabase.admin
       .from('branches')
       .select('*')
-      .order('created_at', { ascending: true })
+      .order('name', { ascending: true })
       .range(from, to)
     if (error) throw error
     return data
@@ -26,8 +26,7 @@ export class BranchesService {
   }
 
   async create(dto: CreateBranchDto) {
-    const payload = { ...dto, created_at: new Date().toISOString() }
-    const { data, error } = await this.supabase.admin.from('branches').insert(payload).select().single()
+    const { data, error } = await this.supabase.admin.from('branches').insert(dto).select().single()
     if (error || !data) throw error || new NotFoundException()
     return data
   }

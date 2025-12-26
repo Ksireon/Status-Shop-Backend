@@ -10,5 +10,12 @@ export class SystemController {
   initBranches() {
     return this.service.ensureBranchesTable()
   }
+  @Post('init-products-schema')
+  initProductsSchema() {
+    return this.service.ensureProductsSchema()
+  }
+  @Post('init-categories')
+  initCategories() {
+    return this.service.ensureCategories()
+  }
 }
-
