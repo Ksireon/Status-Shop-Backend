@@ -1,7 +1,11 @@
 import { Controller, Post, UploadedFile, UseInterceptors, Body, BadRequestException } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { SupabaseService } from '../supabase/supabase.service'
-import type { Express } from 'express'
+type UploadedFile = {
+  originalname: string
+  mimetype: string
+  buffer: Buffer
+}
 
 @Controller('products')
 export class ProductsUploadsController {
@@ -9,7 +13,7 @@ export class ProductsUploadsController {
 
   @Post('image')
   @UseInterceptors(FileInterceptor('file'))
-  async uploadImage(@UploadedFile() file: Express.Multer.File, @Body('tag') tag?: string) {
+  async uploadImage(@UploadedFile() file: UploadedFile, @Body('tag') tag?: string) {
     if (!file) throw new BadRequestException('file is required')
     if (!tag) throw new BadRequestException('tag is required')
     // ensure bucket exists
