@@ -11,6 +11,7 @@ import { ProductsModule } from './products/products.module'
 import { HealthModule } from './health/health.module'
 import { BranchesModule } from './branches/branches.module'
 import { SystemModule } from './system/system.module'
+import { ChatModule } from './chat/chat.module'
 
 @Module({
   imports: [
@@ -24,7 +25,8 @@ import { SystemModule } from './system/system.module'
     ProductsModule,
     HealthModule,
     BranchesModule,
-    SystemModule
+    SystemModule,
+    ChatModule
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }]
 })

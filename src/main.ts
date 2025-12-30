@@ -6,6 +6,7 @@ import { HttpErrorFilter } from './common/filters/http-exception.filter'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import * as cors from 'cors'
 import helmet from 'helmet'
+import { IoAdapter } from '@nestjs/platform-socket.io'
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule)
@@ -24,6 +25,7 @@ async function bootstrap() {
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE']
   }))
+  app.useWebSocketAdapter(new IoAdapter(app))
   app.setGlobalPrefix('api/v1', { exclude: ['docs'] })
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }))
   app.useGlobalFilters(new HttpErrorFilter())
