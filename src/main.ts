@@ -17,10 +17,7 @@ async function bootstrap() {
   app.use(cors({
     origin: (origin, cb) => {
       if (!origin) return cb(null, true)
-      if (allowed.length === 0) {
-        if (/^http:\/\/localhost:\d+$/.test(origin) || /^http:\/\/127\.0\.0\.1:\d+$/.test(origin)) return cb(null, true)
-        return cb(new Error('Not allowed by CORS'))
-      }
+      if (allowed.length === 0) return cb(null, true)
       if (allowed.includes(origin)) return cb(null, true)
       return cb(new Error('Not allowed by CORS'))
     },
@@ -41,7 +38,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config)
   SwaggerModule.setup('docs', app, document)
 
-  const port = process.env.PORT ? Number(process.env.PORT) : 3001
+  const port = Number(process.env.PORT || 8080)
   await app.listen(port)
 }
 
