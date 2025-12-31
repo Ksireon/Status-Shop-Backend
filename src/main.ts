@@ -7,8 +7,10 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import * as cors from 'cors'
 import helmet from 'helmet'
 import { IoAdapter } from '@nestjs/platform-socket.io'
+import { setDefaultResultOrder } from 'node:dns'
 
 async function bootstrap() {
+  setDefaultResultOrder('ipv4first')
   const app = await NestFactory.create(AppModule)
   app.use(helmet())
   const allowed = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean)
