@@ -18,4 +18,9 @@ export class SystemController {
   initCategories() {
     return this.service.ensureCategories()
   }
+
+  @Post('init-chat')
+  initChat() {
+    return this.service.ensureChatSchema()
+  }
 }

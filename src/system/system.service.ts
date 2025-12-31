@@ -88,4 +88,39 @@ export class SystemService {
     }
     return { ok: true }
   }
+
+  async ensureChatSchema() {
+    const dbUrl = this.cfg.get('SUPABASE_DB_URL')
+    if (!dbUrl) throw new InternalServerErrorException('SUPABASE_DB_URL не настроен')
+    const client = new Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } })
+    await client.connect()
+    try {
+      await client.query(`
+        create extension if not exists pgcrypto;
+        create table if not exists public.chat_rooms (
+          id uuid primary key default gen_random_uuid(),
+          user_id uuid not null,
+          assigned_role text check (assigned_role in ('owner','director','manager')),
+          status text not null default 'open',
+          last_message_at timestamptz,
+          created_at timestamptz not null default now()
+        );
+        create index if not exists idx_chat_rooms_user on public.chat_rooms(user_id);
+        create index if not exists idx_chat_rooms_last on public.chat_rooms(last_message_at);
+        create table if not exists public.chat_messages (
+          id uuid primary key default gen_random_uuid(),
+          room_id uuid not null references public.chat_rooms(id) on delete cascade,
+          sender_type text not null check (sender_type in ('user','staff')),
+          sender_id uuid,
+          content text not null,
+          created_at timestamptz not null default now()
+        );
+        create index if not exists idx_chat_messages_room on public.chat_messages(room_id);
+        create index if not exists idx_chat_messages_created on public.chat_messages(created_at);
+      `)
+    } finally {
+      await client.end()
+    }
+    return { ok: true }
+  }
 }
