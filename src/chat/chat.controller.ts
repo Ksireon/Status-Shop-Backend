@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Patch, Query } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { ChatService } from './chat.service'
 
@@ -6,6 +6,12 @@ import { ChatService } from './chat.service'
 @Controller('chat')
 export class ChatController {
   constructor(private readonly chat: ChatService) {}
+
+  @Get('rooms')
+  rooms(@Query('status') status?: string, @Query('assigned_role') role?: 'owner' | 'director' | 'manager', @Query('limit') limit?: string) {
+    const l = limit ? parseInt(limit) : 200
+    return this.chat.listRooms({ status, assigned_role: role, limit: l })
+  }
 
   @Post('init')
   init(@Body('user_id') user_id: string) {
@@ -23,8 +29,13 @@ export class ChatController {
     return this.chat.sendMessage(id, body)
   }
 
-  @Patch('rooms/:id/assign')
-  assign(@Param('id') id: string, @Body('role') role: 'owner' | 'director' | 'manager' | null) {
-    return this.chat.assignRole(id, role)
+  @Post('rooms/:id/assign')
+  assign(@Param('id') id: string, @Body() body: { assigned_role: 'owner' | 'director' | 'manager', assigned_staff_id?: string | null }) {
+    return this.chat.assignRoom(id, body)
+  }
+
+  @Post('rooms/:id/close')
+  close(@Param('id') id: string) {
+    return this.chat.closeRoom(id)
   }
 }

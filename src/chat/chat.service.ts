@@ -6,6 +6,15 @@ import { ChatGateway } from './chat.gateway'
 export class ChatService {
   constructor(private readonly supabase: SupabaseService, private readonly gateway: ChatGateway) {}
 
+  async listRooms(filters: { status?: string; assigned_role?: 'owner' | 'director' | 'manager'; limit?: number }) {
+    let q = this.supabase.admin.from('chat_rooms').select('*')
+    if (filters.assigned_role) q = q.eq('assigned_role', filters.assigned_role)
+    if (filters.status) q = q.eq('status', filters.status)
+    const { data, error } = await q.order('last_message_at', { ascending: false, nullsFirst: false }).limit(filters.limit || 200)
+    if (error) throw error
+    return data
+  }
+
   async ensureRoom(user_id: string) {
     if (!user_id) throw new BadRequestException('user_id required')
     const { data: existing } = await this.supabase.admin
@@ -47,21 +56,27 @@ export class ChatService {
     return data
   }
 
-  async assignRole(room_id: string, role: 'owner' | 'director' | 'manager' | null) {
-    const patch: any = {}
-    if (role === null) {
-      patch.assigned_role = null
-    } else {
-      if (!['owner', 'director', 'manager'].includes(role)) throw new BadRequestException('invalid role')
-      patch.assigned_role = role
-    }
+  async assignRoom(id: string, payload: { assigned_role: 'owner' | 'director' | 'manager'; assigned_staff_id?: string | null }) {
+    const patch: any = { assigned_role: payload.assigned_role }
+    if (payload.assigned_staff_id !== undefined) patch.assigned_staff_id = payload.assigned_staff_id
     const { data, error } = await this.supabase.admin
       .from('chat_rooms')
       .update(patch)
-      .eq('id', room_id)
+      .eq('id', id)
       .select('*')
       .single()
-    if (error || !data) throw new BadRequestException('update failed')
+    if (error) throw error
+    return data
+  }
+
+  async closeRoom(id: string) {
+    const { data, error } = await this.supabase.admin
+      .from('chat_rooms')
+      .update({ status: 'closed', closed_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('*')
+      .single()
+    if (error) throw error
     return data
   }
 }
