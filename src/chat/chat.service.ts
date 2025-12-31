@@ -17,7 +17,7 @@ export class ChatService {
     if (existing?.id) return existing
     const { data, error } = await this.supabase.admin
       .from('chat_rooms')
-      .insert({ user_id, status: 'open' })
+      .insert({ user_id, status: 'open', assigned_role: 'manager' })
       .select('id')
       .single()
     if (error) throw error
@@ -44,6 +44,24 @@ export class ChatService {
     if (error) throw error
     await this.supabase.admin.from('chat_rooms').update({ last_message_at: new Date().toISOString() }).eq('id', room_id)
     try { this.gateway.emitMessage(room_id, data) } catch {}
+    return data
+  }
+
+  async assignRole(room_id: string, role: 'owner' | 'director' | 'manager' | null) {
+    const patch: any = {}
+    if (role === null) {
+      patch.assigned_role = null
+    } else {
+      if (!['owner', 'director', 'manager'].includes(role)) throw new BadRequestException('invalid role')
+      patch.assigned_role = role
+    }
+    const { data, error } = await this.supabase.admin
+      .from('chat_rooms')
+      .update(patch)
+      .eq('id', room_id)
+      .select('*')
+      .single()
+    if (error || !data) throw new BadRequestException('update failed')
     return data
   }
 }

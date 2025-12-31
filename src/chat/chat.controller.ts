@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Patch, Query } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { ChatService } from './chat.service'
 
@@ -21,5 +21,10 @@ export class ChatController {
   @Post('rooms/:id/messages')
   send(@Param('id') id: string, @Body() body: { sender_type: 'user' | 'staff', sender_id?: string, content: string }) {
     return this.chat.sendMessage(id, body)
+  }
+
+  @Patch('rooms/:id/assign')
+  assign(@Param('id') id: string, @Body('role') role: 'owner' | 'director' | 'manager' | null) {
+    return this.chat.assignRole(id, role)
   }
 }
