@@ -91,48 +91,11 @@ export class SystemService {
 
   async ensureChatSchema() {
     const dbUrl = this.cfg.get('SUPABASE_DB_URL')
-    if (dbUrl) {
-      const client = new Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } })
+    if (!dbUrl) throw new InternalServerErrorException('SUPABASE_DB_URL не настроен')
+    const client = new Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } })
+    try {
       await client.connect()
-      try {
-        await client.query(`
-          create extension if not exists pgcrypto;
-          create table if not exists public.chat_rooms (
-            id uuid primary key default gen_random_uuid(),
-            user_id uuid not null,
-            assigned_role text check (assigned_role in ('owner','director','manager')),
-            status text not null default 'open',
-            last_message_at timestamptz,
-            created_at timestamptz not null default now()
-          );
-          create index if not exists idx_chat_rooms_user on public.chat_rooms(user_id);
-          create index if not exists idx_chat_rooms_last on public.chat_rooms(last_message_at);
-          create table if not exists public.chat_messages (
-            id uuid primary key default gen_random_uuid(),
-            room_id uuid not null references public.chat_rooms(id) on delete cascade,
-            sender_type text not null check (sender_type in ('user','staff')),
-            sender_id uuid,
-            content text not null,
-            created_at timestamptz not null default now()
-          );
-          create index if not exists idx_chat_messages_room on public.chat_messages(room_id);
-          create index if not exists idx_chat_messages_created on public.chat_messages(created_at);
-        `)
-      } finally {
-        await client.end()
-      }
-      return { ok: true, via: 'pg' }
-    }
-    const supabaseUrl = this.cfg.get('SUPABASE_URL') || ''
-    const accessToken = this.cfg.get('SUPABASE_ACCESS_TOKEN') || ''
-    const ref = (() => {
-      try {
-        const u = new URL(supabaseUrl)
-        return (u.hostname || '').split('.')[0]
-      } catch { return '' }
-    })()
-    if (ref && accessToken) {
-      const sql = `
+      await client.query(`
         create extension if not exists pgcrypto;
         create table if not exists public.chat_rooms (
           id uuid primary key default gen_random_uuid(),
@@ -140,10 +103,14 @@ export class SystemService {
           assigned_role text check (assigned_role in ('owner','director','manager')),
           status text not null default 'open',
           last_message_at timestamptz,
-          created_at timestamptz not null default now()
+          created_at timestamptz not null default now(),
+          assigned_staff_id uuid,
+          closed_at timestamptz
         );
         create index if not exists idx_chat_rooms_user on public.chat_rooms(user_id);
-        create index if not exists idx_chat_rooms_last on public.chat_rooms(last_message_at);
+        create index if not exists idx_chat_rooms_role on public.chat_rooms(assigned_role);
+        create index if not exists idx_chat_rooms_staff on public.chat_rooms(assigned_staff_id);
+        create index if not exists idx_chat_rooms_closed on public.chat_rooms(closed_at);
         create table if not exists public.chat_messages (
           id uuid primary key default gen_random_uuid(),
           room_id uuid not null references public.chat_rooms(id) on delete cascade,
@@ -173,22 +140,12 @@ export class SystemService {
           exception when others then null;
           end;
         end $$;
-        alter table if exists public.chat_rooms
-          add column if not exists assigned_staff_id uuid,
-          add column if not exists closed_at timestamptz;
-        create index if not exists idx_chat_rooms_role on public.chat_rooms(assigned_role);
-        create index if not exists idx_chat_rooms_staff on public.chat_rooms(assigned_staff_id);
-        create index if not exists idx_chat_rooms_closed on public.chat_rooms(closed_at);
-      `
-      const resp = await fetch(`https://api.supabase.com/v1/projects/${ref}/sql`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: sql }),
-      })
-      if (resp.ok) return { ok: true, via: 'sql-http' }
-      const txt = await resp.text()
-      throw new InternalServerErrorException(txt || 'Supabase SQL over HTTP failed')
+      `)
+    } catch (e: any) {
+      throw new InternalServerErrorException(e?.message || 'PG initialization failed')
+    } finally {
+      await client.end()
     }
-    throw new InternalServerErrorException('SUPABASE_DB_URL/SUPABASE_ACCESS_TOKEN не настроен')
+    return { ok: true, via: 'pg' }
   }
 }
