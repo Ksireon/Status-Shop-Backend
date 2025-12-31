@@ -2,7 +2,7 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common'
 import { SupabaseService } from '../supabase/supabase.service'
 import { ConfigService } from '../config/config.service'
 import { Client } from 'pg'
-import { lookup as dnsLookup } from 'node:dns/promises'
+import { resolve4 } from 'node:dns/promises'
 
 @Injectable()
 export class SystemService {
@@ -96,8 +96,8 @@ export class SystemService {
     const u = new URL(dbUrl)
     let addr4 = u.hostname
     try {
-      const r = await dnsLookup(u.hostname, { family: 4 })
-      addr4 = r.address
+      const arr = await resolve4(u.hostname)
+      if (arr && arr.length > 0) addr4 = arr[0]
     } catch {}
     const baseCfg = {
       host: addr4,
@@ -210,6 +210,70 @@ export class SystemService {
             end $$;
           `)
         } catch (e2: any) {
+          const supabaseUrl = this.cfg.get('SUPABASE_URL') || ''
+          const accessToken = this.cfg.get('SUPABASE_ACCESS_TOKEN') || ''
+          const ref = (() => {
+            try {
+              const u2 = new URL(supabaseUrl)
+              return (u2.hostname || '').split('.')[0]
+            } catch { return '' }
+          })()
+          if (ref && accessToken) {
+            const sql = `
+              create extension if not exists pgcrypto;
+              create table if not exists public.chat_rooms (
+                id uuid primary key default gen_random_uuid(),
+                user_id uuid not null,
+                assigned_role text check (assigned_role in ('owner','director','manager')),
+                status text not null default 'open',
+                last_message_at timestamptz,
+                created_at timestamptz not null default now(),
+                assigned_staff_id uuid,
+                closed_at timestamptz
+              );
+              create index if not exists idx_chat_rooms_user on public.chat_rooms(user_id);
+              create index if not exists idx_chat_rooms_role on public.chat_rooms(assigned_role);
+              create index if not exists idx_chat_rooms_staff on public.chat_rooms(assigned_staff_id);
+              create index if not exists idx_chat_rooms_closed on public.chat_rooms(closed_at);
+              create table if not exists public.chat_messages (
+                id uuid primary key default gen_random_uuid(),
+                room_id uuid not null references public.chat_rooms(id) on delete cascade,
+                sender_type text not null check (sender_type in ('user','staff')),
+                sender_id uuid,
+                content text not null,
+                created_at timestamptz not null default now()
+              );
+              create index if not exists idx_chat_messages_room on public.chat_messages(room_id);
+              create index if not exists idx_chat_messages_created on public.chat_messages(created_at);
+              alter table public.chat_rooms enable row level security;
+              alter table public.chat_messages enable row level security;
+              do $$ begin
+                if not exists (select 1 from pg_policies where schemaname='public' and tablename='chat_rooms' and policyname='chat_rooms_read_all') then
+                  create policy chat_rooms_read_all on public.chat_rooms for select to anon using (true);
+                end if;
+                if not exists (select 1 from pg_policies where schemaname='public' and tablename='chat_messages' and policyname='chat_messages_read_all') then
+                  create policy chat_messages_read_all on public.chat_messages for select to anon using (true);
+                end if;
+                if not exists (select 1 from pg_policies where schemaname='public' and tablename='chat_messages' and policyname='chat_messages_insert_all') then
+                  create policy chat_messages_insert_all on public.chat_messages for insert to anon with check (true);
+                end if;
+              end $$;
+              do $$ begin
+                begin
+                  alter publication supabase_realtime add table public.chat_messages;
+                exception when others then null;
+                end;
+              end $$;
+            `
+            const resp = await fetch(`https://api.supabase.com/v1/projects/${ref}/sql`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query: sql }),
+            })
+            if (resp.ok) return { ok: true, via: 'sql-http' }
+            const txt = await resp.text()
+            throw new InternalServerErrorException(txt || e2?.message || msg || 'Initialization failed')
+          }
           throw new InternalServerErrorException(e2?.message || msg || 'PG initialization failed')
         }
       } else {
