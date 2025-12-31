@@ -124,7 +124,7 @@ export class SystemService {
       return { ok: true, via: 'pg' }
     }
     const supabaseUrl = this.cfg.get('SUPABASE_URL') || ''
-    const accessToken = this.cfg.get('SUPABASE_ACCESS_TOKEN') || this.cfg.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    const accessToken = this.cfg.get('SUPABASE_ACCESS_TOKEN') || ''
     const ref = (() => {
       try {
         const u = new URL(supabaseUrl)
