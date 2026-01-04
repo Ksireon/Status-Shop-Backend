@@ -127,6 +127,12 @@ export class SystemService {
           if not exists (select 1 from pg_policies where schemaname='public' and tablename='chat_rooms' and policyname='chat_rooms_read_all') then
             create policy chat_rooms_read_all on public.chat_rooms for select to anon using (true);
           end if;
+          if not exists (select 1 from pg_policies where schemaname='public' and tablename='chat_rooms' and policyname='chat_rooms_insert_all') then
+            create policy chat_rooms_insert_all on public.chat_rooms for insert to anon with check (user_id is not null);
+          end if;
+          if not exists (select 1 from pg_policies where schemaname='public' and tablename='chat_rooms' and policyname='chat_rooms_update_all') then
+            create policy chat_rooms_update_all on public.chat_rooms for update to anon using (true) with check (true);
+          end if;
           if not exists (select 1 from pg_policies where schemaname='public' and tablename='chat_messages' and policyname='chat_messages_read_all') then
             create policy chat_messages_read_all on public.chat_messages for select to anon using (true);
           end if;
@@ -134,9 +140,48 @@ export class SystemService {
             create policy chat_messages_insert_all on public.chat_messages for insert to anon with check (true);
           end if;
         end $$;
+        create or replace function public.chat_rooms_touch_last_message_at()
+        returns trigger
+        language plpgsql
+        as $$
+        begin
+          update public.chat_rooms
+            set last_message_at = new.created_at
+            where id = new.room_id;
+          return new;
+        end;
+        $$;
+        drop trigger if exists trg_chat_messages_touch_room on public.chat_messages;
+        create trigger trg_chat_messages_touch_room
+        after insert on public.chat_messages
+        for each row
+        execute function public.chat_rooms_touch_last_message_at();
+        create or replace function public.chat_messages_block_closed_room()
+        returns trigger
+        language plpgsql
+        as $$
+        declare
+          v_status text;
+        begin
+          select status into v_status from public.chat_rooms where id = new.room_id;
+          if v_status = 'closed' then
+            raise exception 'Chat room is closed';
+          end if;
+          return new;
+        end;
+        $$;
+        drop trigger if exists trg_chat_messages_block_closed_room on public.chat_messages;
+        create trigger trg_chat_messages_block_closed_room
+        before insert on public.chat_messages
+        for each row
+        execute function public.chat_messages_block_closed_room();
         do $$ begin
           begin
             alter publication supabase_realtime add table public.chat_messages;
+          exception when others then null;
+          end;
+          begin
+            alter publication supabase_realtime add table public.chat_rooms;
           exception when others then null;
           end;
         end $$;
