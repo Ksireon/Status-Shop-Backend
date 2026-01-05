@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, InternalServerErrorException } from '@nestjs/common'
 import { Client } from 'pg'
+import { resolve4 } from 'node:dns/promises'
 import { SupabaseService } from '../supabase/supabase.service'
 import { CartItemDto } from './dto/cart-item.dto'
 import { ConfigService } from '../config/config.service'
@@ -10,6 +11,30 @@ export class CartService {
     private readonly supabase: SupabaseService,
     private readonly cfg: ConfigService,
   ) {}
+
+  private async makePgClient(dbUrl: string) {
+    const u = new URL(dbUrl)
+    const host = u.hostname
+    const port = u.port ? Number(u.port) : 5432
+    const user = decodeURIComponent(u.username || '')
+    const password = decodeURIComponent(u.password || '')
+    const database = (u.pathname || '').replace(/^\//, '') || 'postgres'
+
+    let hostIp = host
+    try {
+      const ips = await resolve4(host)
+      if (ips && ips.length > 0) hostIp = ips[0]
+    } catch (_) {}
+
+    return new Client({
+      host: hostIp,
+      port,
+      user,
+      password,
+      database,
+      ssl: { rejectUnauthorized: false },
+    })
+  }
 
   async list(uid: string, opts: { page: number, limit: number }) {
     const from = (opts.page - 1) * opts.limit
@@ -35,7 +60,7 @@ export class CartService {
     const dbUrl = this.cfg.get('SUPABASE_DB_URL')
     if (!dbUrl) throw new InternalServerErrorException('SUPABASE_DB_URL не настроен')
 
-    const client = new Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } })
+    const client = await this.makePgClient(dbUrl)
     await client.connect()
 
     let didBegin = false
