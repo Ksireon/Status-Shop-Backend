@@ -42,12 +42,20 @@ export class AuthService {
     const { data, error } = await this.supabase.admin.auth.signInWithPassword({ email: dto.email.toLowerCase(), password: dto.password })
     if (error || !data.session) throw new UnauthorizedException('Invalid credentials')
     const token = data.session.access_token
+    const refresh_token = data.session.refresh_token
     const { data: profile } = await this.supabase.admin
       .from('profiles')
       .select('*')
       .eq('id', data.user?.id ?? '')
       .single()
-    return { token, uid: data.user?.id, profile }
+    return { token, refresh_token, uid: data.user?.id, profile }
+  }
+
+  async refresh(refreshToken: string) {
+    if (!refreshToken) throw new UnauthorizedException('Invalid refresh token')
+    const { data, error } = await this.supabase.anon.auth.refreshSession({ refresh_token: refreshToken })
+    if (error || !data.session) throw new UnauthorizedException('Invalid refresh token')
+    return { token: data.session.access_token, refresh_token: data.session.refresh_token, uid: data.user?.id }
   }
 
   async me(token: string) {
