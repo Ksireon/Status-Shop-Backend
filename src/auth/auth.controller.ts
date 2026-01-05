@@ -19,12 +19,6 @@ export class AuthController {
     return this.service.login(dto)
   }
 
-  @Post('refresh')
-  refresh(@Body() body: any) {
-    const token = String(body?.refresh_token || '')
-    return this.service.refresh(token)
-  }
-
   @ApiBearerAuth()
   @Get('me')
   me(@Headers('authorization') auth: string) {

@@ -12,25 +12,6 @@ export class CartService {
     private readonly cfg: ConfigService,
   ) {}
 
-  private extractProductTag(item: any): string {
-    const v =
-      item?.product_tag ??
-      item?.productTag ??
-      item?.product ??
-      item?.productTagId
-    return String(v || '').trim()
-  }
-
-  private extractCartTag(item: any): string {
-    return String(item?.tag || '').trim()
-  }
-
-  private extractDecrement(item: any): number {
-    const meters = Number(item?.meters ?? 0)
-    if (Number.isFinite(meters) && meters > 0) return meters
-    return Number(item?.quantity ?? 0)
-  }
-
   private async makePgClient(dbUrl: string) {
     const u = new URL(dbUrl)
     const host = u.hostname
@@ -69,15 +50,15 @@ export class CartService {
   }
 
   async add(uid: string, item: CartItemDto) {
-    const productTag = this.extractProductTag(item as any)
+    const productTag = String((item as any)?.product_tag || '').trim()
     if (!productTag) throw new BadRequestException('product_tag is required')
-    const dec = this.extractDecrement(item as any)
+    const meters = Number((item as any)?.meters ?? 0)
+    const quantity = Number((item as any)?.quantity ?? 0)
+    const dec = Number.isFinite(meters) && meters > 0 ? meters : quantity
     if (!Number.isFinite(dec) || dec <= 0) throw new BadRequestException('quantity must be > 0')
 
     const dbUrl = this.cfg.get('SUPABASE_DB_URL')
-    if (!dbUrl) {
-      return this.addViaSupabase(uid, item, productTag, dec)
-    }
+    if (!dbUrl) throw new InternalServerErrorException('SUPABASE_DB_URL не настроен')
 
     const client = await this.makePgClient(dbUrl)
     await client.connect()
@@ -126,72 +107,6 @@ export class CartService {
     } finally {
       await client.end()
     }
-  }
-
-  private async addViaSupabase(uid: string, item: CartItemDto, productTag: string, dec: number) {
-    const cartTag = this.extractCartTag(item as any)
-    if (!cartTag) throw new BadRequestException('tag is required')
-
-    const maxAttempts = 4
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const { data: product, error: productError } = await this.supabase.admin
-        .from('products')
-        .select('amount')
-        .eq('tag', productTag)
-        .single()
-
-      if (productError || !product) {
-        throw new BadRequestException('Товар не найден')
-      }
-
-      const amountRaw = (product as any).amount
-      const currentAmount = Number(amountRaw ?? 0)
-      if (!Number.isFinite(currentAmount)) {
-        throw new InternalServerErrorException('Некорректное значение amount')
-      }
-      if (currentAmount < dec) {
-        throw new ConflictException('Недостаточно товара на складе')
-      }
-
-      const nextAmount = currentAmount - dec
-      const { data: updatedRows, error: updateError } = await this.supabase.admin
-        .from('products')
-        .update({ amount: nextAmount })
-        .eq('tag', productTag)
-        .eq('amount', amountRaw)
-        .select('amount')
-
-      if (updateError) throw updateError
-      if (!updatedRows || updatedRows.length === 0) continue
-
-      const { data: inserted, error: insertError } = await this.supabase.admin
-        .from('cart_items')
-        .insert({
-          user_id: uid,
-          data: item as any,
-          tag: cartTag,
-          created_at: new Date().toISOString(),
-        })
-        .select('*')
-        .single()
-
-      if (insertError || !inserted) {
-        await this.supabase.admin
-          .from('products')
-          .update({ amount: currentAmount })
-          .eq('tag', productTag)
-          .eq('amount', nextAmount)
-        throw insertError ?? new InternalServerErrorException('Не удалось добавить в корзину')
-      }
-
-      if (Number.isFinite(nextAmount) && nextAmount <= 0) {
-        await this.supabase.admin.from('products').delete().eq('tag', productTag)
-      }
-
-      return inserted
-    }
-
-    throw new ConflictException('Не удалось зарезервировать товар, попробуйте еще раз')
   }
 
   async remove(uid: string, tag: string) {
