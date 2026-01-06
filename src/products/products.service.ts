@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { SupabaseService } from '../supabase/supabase.service'
 
 @Injectable()
@@ -70,16 +70,19 @@ export class ProductsService {
     return data
   }
 
-  async stockByTag(tag?: string) {
+  async getStockByTag(tag: string) {
     const t = String(tag || '').trim()
     if (!t) throw new BadRequestException('tag is required')
-    const { data, error } = await this.supabase.admin.from('products').select('amount').eq('tag', t).single()
-    if (error) {
-      const code = String((error as any)?.code || '')
-      const msg = String((error as any)?.message || '')
-      if (code === 'PGRST116') throw new NotFoundException('Product not found')
-      throw new InternalServerErrorException(msg || 'Ошибка получения остатка')
-    }
-    return { tag: t, amount: (data as any)?.amount }
+
+    const { data, error } = await this.supabase.admin
+      .from('products')
+      .select('amount')
+      .eq('tag', t)
+      .limit(1)
+      .maybeSingle()
+
+    if (error) throw error
+    if (!data) throw new NotFoundException('Product not found')
+    return { amount: (data as any).amount }
   }
 }
