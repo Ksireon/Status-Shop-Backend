@@ -1,16 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
-import { Client } from 'pg'
 import { SupabaseService } from '../supabase/supabase.service'
-import { ConfigService } from '../config/config.service'
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly supabase: SupabaseService, private readonly cfg: ConfigService) {}
-
-  private isTagTypeMismatch(err: any) {
-    const msg = String(err?.message || '').toLowerCase()
-    return msg.includes('operator does not exist') || msg.includes('invalid input syntax') || msg.includes('could not find the') || msg.includes('cannot cast')
-  }
+  constructor(private readonly supabase: SupabaseService) {}
 
   async list(opts: { page: number, limit: number, sort: string, order: 'asc' | 'desc' }) {
     const from = (opts.page - 1) * opts.limit
@@ -81,55 +74,15 @@ export class ProductsService {
     const t = String(tag || '').trim()
     if (!t) throw new BadRequestException('tag is required')
 
-    const dbUrl = this.cfg.get('SUPABASE_DB_URL')
-    if (dbUrl) {
-      const client = new Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } })
-      await client.connect()
-      try {
-        const col = await client.query(
-          `select data_type from information_schema.columns where table_schema='public' and table_name='products' and column_name='tag' limit 1;`,
-        )
-        const dataType = String(col.rows?.[0]?.data_type || '').toLowerCase()
-        if (dataType === 'json' || dataType === 'jsonb') {
-          const jsonString = JSON.stringify(t)
-          const res = await client.query(
-            `select amount from public.products
-             where (tag->>'en' = $1 or tag->>'ru' = $1 or tag->>'uz' = $1 or tag::text = $2)
-             limit 1;`,
-            [t, jsonString],
-          )
-          if (res.rows.length === 0) throw new NotFoundException('Product not found')
-          return { amount: res.rows[0].amount }
-        }
+    const { data, error } = await this.supabase.admin
+      .from('products')
+      .select('amount')
+      .eq('tag', t)
+      .limit(1)
+      .maybeSingle()
 
-        const res = await client.query(`select amount from public.products where tag = $1 limit 1;`, [t])
-        if (res.rows.length === 0) throw new NotFoundException('Product not found')
-        return { amount: res.rows[0].amount }
-      } finally {
-        await client.end()
-      }
-    }
-
-    const tagExprs = ['tag', 'tag->>en', 'tag->>ru', 'tag->>uz']
-    let lastErr: any = null
-    for (const expr of tagExprs) {
-      const admin: any = this.supabase.admin as any
-      const { data, error } = await admin
-        .from('products')
-        .select('amount')
-        .eq(expr, t)
-        .limit(1)
-        .maybeSingle()
-
-      if (error) {
-        lastErr = error
-        if (this.isTagTypeMismatch(error)) continue
-        throw error
-      }
-      if (data) return { amount: (data as any).amount }
-    }
-
-    if (lastErr) throw lastErr
-    throw new NotFoundException('Product not found')
+    if (error) throw error
+    if (!data) throw new NotFoundException('Product not found')
+    return { amount: (data as any).amount }
   }
 }
