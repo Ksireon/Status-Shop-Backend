@@ -91,11 +91,6 @@ export class CartService {
         [uid, JSON.stringify(item), item.tag]
       )
 
-      const newAmount = Number((updated.rows[0] as any)?.amount ?? 0)
-      if (Number.isFinite(newAmount) && newAmount <= 0) {
-        await client.query(`delete from public.products where tag = $1`, [productTag])
-      }
-
       await client.query('commit')
       didBegin = false
       return inserted.rows[0]
@@ -110,14 +105,98 @@ export class CartService {
   }
 
   async remove(uid: string, tag: string) {
-    const { error } = await this.supabase.admin.from('cart_items').delete().eq('user_id', uid).eq('tag', tag)
-    if (error) throw error
-    return { ok: true }
+    const dbUrl = this.cfg.get('SUPABASE_DB_URL')
+    if (!dbUrl) throw new InternalServerErrorException('SUPABASE_DB_URL не настроен')
+    const client = await this.makePgClient(dbUrl)
+    await client.connect()
+
+    let didBegin = false
+    try {
+      await client.query('begin')
+      didBegin = true
+
+      const existing = await client.query(
+        `select data from public.cart_items where user_id = $1 and tag = $2 for update`,
+        [uid, tag]
+      )
+
+      if (existing.rowCount === 0) {
+        await client.query('commit')
+        didBegin = false
+        return { ok: true }
+      }
+
+      const data = (existing.rows[0] as any)?.data ?? {}
+      const productTag = String((data as any)?.product_tag || '').trim()
+      const meters = Number((data as any)?.meters ?? 0)
+      const quantity = Number((data as any)?.quantity ?? 0)
+      const inc = Number.isFinite(meters) && meters > 0 ? meters : quantity
+
+      await client.query(`delete from public.cart_items where user_id = $1 and tag = $2`, [uid, tag])
+
+      if (productTag && Number.isFinite(inc) && inc > 0) {
+        await client.query(
+          `update public.products set amount = amount + $2 where tag = $1`,
+          [productTag, inc]
+        )
+      }
+
+      await client.query('commit')
+      didBegin = false
+      return { ok: true }
+    } catch (e) {
+      if (didBegin) {
+        try { await client.query('rollback') } catch (_) {}
+      }
+      throw e
+    } finally {
+      await client.end()
+    }
   }
 
   async clear(uid: string) {
-    const { error } = await this.supabase.admin.from('cart_items').delete().eq('user_id', uid)
-    if (error) throw error
-    return { ok: true }
+    const dbUrl = this.cfg.get('SUPABASE_DB_URL')
+    if (!dbUrl) throw new InternalServerErrorException('SUPABASE_DB_URL не настроен')
+    const client = await this.makePgClient(dbUrl)
+    await client.connect()
+
+    let didBegin = false
+    try {
+      await client.query('begin')
+      didBegin = true
+
+      const existing = await client.query(`select data from public.cart_items where user_id = $1 for update`, [uid])
+      await client.query(`delete from public.cart_items where user_id = $1`, [uid])
+
+      const totals = new Map<string, number>()
+      for (const r of existing.rows || []) {
+        const data = (r as any)?.data ?? {}
+        const productTag = String((data as any)?.product_tag || '').trim()
+        if (!productTag) continue
+        const meters = Number((data as any)?.meters ?? 0)
+        const quantity = Number((data as any)?.quantity ?? 0)
+        const inc = Number.isFinite(meters) && meters > 0 ? meters : quantity
+        if (!Number.isFinite(inc) || inc <= 0) continue
+        totals.set(productTag, (totals.get(productTag) ?? 0) + inc)
+      }
+
+      for (const [productTag, inc] of totals.entries()) {
+        await client.query(
+          `update public.products set amount = amount + $2 where tag = $1`,
+          [productTag, inc]
+        )
+      }
+
+      await client.query('commit')
+      didBegin = false
+      return { ok: true }
+    } catch (e) {
+      if (didBegin) {
+        try { await client.query('rollback') } catch (_) {}
+      }
+      throw e
+    } finally {
+      await client.end()
+    }
   }
 }

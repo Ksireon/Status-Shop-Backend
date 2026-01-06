@@ -56,11 +56,62 @@ export class SystemService {
     try {
       await client.query(`
         alter table if exists public.products
-          add column if not exists amount numeric(12,2) default 0 not null,
-          add column if not exists characteristic text default '' not null;
+          add column if not exists amount numeric(12,2) default 0 not null;
       `)
-      await client.query(`do $$ begin begin alter table public.products drop column if exists meters; exception when undefined_column then null; end; end $$;`)
-      await client.query(`do $$ begin begin alter table public.products drop column if exists size; exception when undefined_column then null; end; end $$;`)
+
+      await client.query(`
+        do $$
+        begin
+          if exists (
+            select 1 from information_schema.columns
+            where table_schema='public' and table_name='products' and column_name='type'
+          ) then
+            if (select data_type from information_schema.columns where table_schema='public' and table_name='products' and column_name='type') <> 'jsonb' then
+              alter table public.products alter column type type jsonb using jsonb_build_object('en', type);
+            end if;
+          end if;
+
+          if exists (
+            select 1 from information_schema.columns
+            where table_schema='public' and table_name='products' and column_name='color'
+          ) then
+            if (select data_type from information_schema.columns where table_schema='public' and table_name='products' and column_name='color') <> 'jsonb' then
+              alter table public.products alter column color type jsonb using jsonb_build_object('en', color);
+            end if;
+          end if;
+
+          if exists (
+            select 1 from information_schema.columns
+            where table_schema='public' and table_name='products' and column_name='characteristic'
+          ) then
+            if (select data_type from information_schema.columns where table_schema='public' and table_name='products' and column_name='characteristic') <> 'jsonb' then
+              alter table public.products alter column characteristic type jsonb using jsonb_build_object('en', characteristic);
+            end if;
+          else
+            alter table public.products add column characteristic jsonb not null default '{}'::jsonb;
+          end if;
+
+          if exists (
+            select 1 from information_schema.columns
+            where table_schema='public' and table_name='products' and column_name='meters'
+          ) then
+            update public.products set amount = coalesce(amount, 0) + coalesce(meters, 0);
+          end if;
+
+          if exists (
+            select 1 from information_schema.columns
+            where table_schema='public' and table_name='products' and column_name='size'
+          ) then
+            update public.products
+            set characteristic =
+              case
+                when characteristic is null or characteristic = '{}'::jsonb
+                then jsonb_build_object('en', size)
+                else characteristic || jsonb_build_object('en', size)
+              end;
+          end if;
+        end $$;
+      `)
     } finally {
       await client.end()
     }

@@ -42,12 +42,28 @@ export class AuthService {
     const { data, error } = await this.supabase.admin.auth.signInWithPassword({ email: dto.email.toLowerCase(), password: dto.password })
     if (error || !data.session) throw new UnauthorizedException('Invalid credentials')
     const token = data.session.access_token
+    const refresh_token = data.session.refresh_token
+    const expires_in = data.session.expires_in
     const { data: profile } = await this.supabase.admin
       .from('profiles')
       .select('*')
       .eq('id', data.user?.id ?? '')
       .single()
-    return { token, uid: data.user?.id, profile }
+    return { token, refresh_token, expires_in, uid: data.user?.id, profile }
+  }
+
+  async refresh(refresh_token: string) {
+    if (!refresh_token) throw new UnauthorizedException('Invalid refresh token')
+    try {
+      const refreshed = await this.supabase.refreshSession(refresh_token)
+      const token = refreshed.access_token
+      const rt = refreshed.refresh_token
+      const uid = refreshed.user?.id
+      if (!token || !uid) throw new UnauthorizedException('Invalid refresh token')
+      return { token, refresh_token: rt, expires_in: refreshed.expires_in, uid }
+    } catch (_) {
+      throw new UnauthorizedException('Invalid refresh token')
+    }
   }
 
   async me(token: string) {
