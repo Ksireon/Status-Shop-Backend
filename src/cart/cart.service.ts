@@ -1,10 +1,12 @@
 import { BadRequestException, ConflictException, Injectable, InternalServerErrorException } from '@nestjs/common'
+import { Client } from 'pg'
+import { ConfigService } from '../config/config.service'
 import { SupabaseService } from '../supabase/supabase.service'
 import { CartItemDto } from './dto/cart-item.dto'
 
 @Injectable()
 export class CartService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly supabase: SupabaseService, private readonly cfg: ConfigService) {}
 
   private isMissingRpc(err: any) {
     const code = String(err?.code || '')
@@ -18,21 +20,131 @@ export class CartService {
     return code === '28000' || code === '42501' || msg.includes('unauthorized') || msg.includes('forbidden')
   }
 
-  private async getStock(ref: { productId?: string, productTag?: string }) {
-    const q = this.supabase.admin.from('products').select('amount')
-    const res = ref.productId
-      ? await q.eq('id', ref.productId).single()
-      : await q.eq('tag', ref.productTag as any).single()
+  private isTagTypeMismatch(err: any) {
+    const msg = String(err?.message || '').toLowerCase()
+    return msg.includes('operator does not exist') || msg.includes('invalid input syntax') || msg.includes('cannot cast')
+  }
 
-    if (res.error) {
-      const msg = String((res.error as any)?.message || '')
-      throw new InternalServerErrorException(msg || 'Ошибка получения товара')
+  private async getStockByTagSupabase(productTag: string) {
+    const tag = String(productTag || '').trim()
+    if (!tag) throw new InternalServerErrorException('Ошибка получения товара')
+
+    const admin: any = this.supabase.admin as any
+    const tagExprs = ['tag', 'tag->>en', 'tag->>ru', 'tag->>uz']
+    let lastErr: any = null
+    for (const expr of tagExprs) {
+      const res = await admin.from('products').select('amount').eq(expr, tag).limit(1).maybeSingle()
+      if (res.error) {
+        lastErr = res.error
+        if (this.isTagTypeMismatch(res.error)) continue
+        const msg = String((res.error as any)?.message || '')
+        throw new InternalServerErrorException(msg || 'Ошибка получения товара')
+      }
+      return { currentRaw: (res.data as any)?.amount }
     }
 
-    return { currentRaw: (res.data as any)?.amount }
+    const msg = String((lastErr as any)?.message || '')
+    throw new InternalServerErrorException(msg || 'Ошибка получения товара')
+  }
+
+  private async decrementStockPg(ref: { productId?: string, productTag?: string }, dec: number) {
+    const dbUrl = this.cfg.get('SUPABASE_DB_URL')
+    if (!dbUrl) return null
+    const client = new Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } })
+    await client.connect()
+    try {
+      if (ref.productId) {
+        const res = await client.query(
+          `update public.products set amount = amount - $1 where id = $2 and amount >= $1 returning amount;`,
+          [dec, ref.productId],
+        )
+        if (res.rows.length === 0) throw new ConflictException('Недостаточно товара на складе')
+        return { nextAmount: res.rows[0].amount }
+      }
+
+      const tag = String(ref.productTag || '').trim()
+      if (!tag) return null
+      const col = await client.query(
+        `select data_type from information_schema.columns where table_schema='public' and table_name='products' and column_name='tag' limit 1;`,
+      )
+      const dataType = String(col.rows?.[0]?.data_type || '').toLowerCase()
+      if (dataType === 'json' || dataType === 'jsonb') {
+        const jsonString = JSON.stringify(tag)
+        const res = await client.query(
+          `update public.products
+           set amount = amount - $1
+           where (tag->>'en' = $2 or tag->>'ru' = $2 or tag->>'uz' = $2 or tag::text = $3)
+             and amount >= $1
+           returning amount;`,
+          [dec, tag, jsonString],
+        )
+        if (res.rows.length === 0) throw new ConflictException('Недостаточно товара на складе')
+        return { nextAmount: res.rows[0].amount }
+      }
+
+      const res = await client.query(
+        `update public.products set amount = amount - $1 where tag = $2 and amount >= $1 returning amount;`,
+        [dec, tag],
+      )
+      if (res.rows.length === 0) throw new ConflictException('Недостаточно товара на складе')
+      return { nextAmount: res.rows[0].amount }
+    } finally {
+      await client.end()
+    }
+  }
+
+  private async incrementStockPg(ref: { productId?: string, productTag?: string }, inc: number) {
+    const dbUrl = this.cfg.get('SUPABASE_DB_URL')
+    if (!dbUrl) return null
+    const client = new Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } })
+    await client.connect()
+    try {
+      if (ref.productId) {
+        await client.query(`update public.products set amount = amount + $1 where id = $2;`, [inc, ref.productId])
+        return { ok: true }
+      }
+
+      const tag = String(ref.productTag || '').trim()
+      if (!tag) return null
+      const col = await client.query(
+        `select data_type from information_schema.columns where table_schema='public' and table_name='products' and column_name='tag' limit 1;`,
+      )
+      const dataType = String(col.rows?.[0]?.data_type || '').toLowerCase()
+      if (dataType === 'json' || dataType === 'jsonb') {
+        const jsonString = JSON.stringify(tag)
+        await client.query(
+          `update public.products
+           set amount = amount + $1
+           where (tag->>'en' = $2 or tag->>'ru' = $2 or tag->>'uz' = $2 or tag::text = $3);`,
+          [inc, tag, jsonString],
+        )
+        return { ok: true }
+      }
+
+      await client.query(`update public.products set amount = amount + $1 where tag = $2;`, [inc, tag])
+      return { ok: true }
+    } finally {
+      await client.end()
+    }
+  }
+
+  private async getStock(ref: { productId?: string, productTag?: string }) {
+    const q = this.supabase.admin.from('products').select('amount')
+    if (ref.productId) {
+      const res = await q.eq('id', ref.productId).single()
+      if (res.error) {
+        const msg = String((res.error as any)?.message || '')
+        throw new InternalServerErrorException(msg || 'Ошибка получения товара')
+      }
+      return { currentRaw: (res.data as any)?.amount }
+    }
+
+    return this.getStockByTagSupabase(String(ref.productTag || ''))
   }
 
   private async decrementStock(ref: { productId?: string, productTag?: string }, dec: number) {
+    const viaPg = await this.decrementStockPg(ref, dec)
+    if (viaPg) return viaPg
     for (let attempt = 0; attempt < 5; attempt++) {
       const { currentRaw } = await this.getStock(ref)
       const current = Number(currentRaw ?? 0)
@@ -40,15 +152,33 @@ export class CartService {
       if (current < dec) throw new ConflictException('Недостаточно товара на складе')
 
       const next = current - dec
-      const updBase = this.supabase.admin
+      const updBase: any = (this.supabase.admin as any)
         .from('products')
-        .update({ amount: next } as any)
-        .eq('amount', currentRaw as any)
+        .update({ amount: next })
+        .eq('amount', currentRaw)
         .select('amount')
 
-      const { data: updated, error: updErr } = ref.productId
-        ? await updBase.eq('id', ref.productId)
-        : await updBase.eq('tag', ref.productTag as any)
+      let updated: any
+      let updErr: any = null
+      if (ref.productId) {
+        const res = await updBase.eq('id', ref.productId)
+        updated = res.data
+        updErr = res.error
+      } else {
+        const tag = String(ref.productTag || '').trim()
+        const tagExprs = ['tag', 'tag->>en', 'tag->>ru', 'tag->>uz']
+        for (const expr of tagExprs) {
+          const res = await updBase.eq(expr, tag)
+          if (res.error) {
+            updErr = res.error
+            if (this.isTagTypeMismatch(res.error)) continue
+            break
+          }
+          updated = res.data
+          updErr = null
+          break
+        }
+      }
 
       if (updErr) {
         const msg = String((updErr as any)?.message || '')
@@ -65,6 +195,8 @@ export class CartService {
 
   private async incrementStock(ref: { productId?: string, productTag?: string }, inc: number) {
     if ((!ref.productId && !ref.productTag) || !Number.isFinite(inc) || inc <= 0) return
+    const viaPg = await this.incrementStockPg(ref, inc)
+    if (viaPg) return
     for (let attempt = 0; attempt < 5; attempt++) {
       let stock: { currentRaw: any } | null = null
       try {
@@ -78,15 +210,33 @@ export class CartService {
       if (!Number.isFinite(current)) return
       const next = current + inc
 
-      const updBase = this.supabase.admin
+      const updBase: any = (this.supabase.admin as any)
         .from('products')
-        .update({ amount: next } as any)
-        .eq('amount', currentRaw as any)
+        .update({ amount: next })
+        .eq('amount', currentRaw)
         .select('amount')
 
-      const { data: updated, error: updErr } = ref.productId
-        ? await updBase.eq('id', ref.productId)
-        : await updBase.eq('tag', ref.productTag as any)
+      let updated: any
+      let updErr: any = null
+      if (ref.productId) {
+        const res = await updBase.eq('id', ref.productId)
+        updated = res.data
+        updErr = res.error
+      } else {
+        const tag = String(ref.productTag || '').trim()
+        const tagExprs = ['tag', 'tag->>en', 'tag->>ru', 'tag->>uz']
+        for (const expr of tagExprs) {
+          const res = await updBase.eq(expr, tag)
+          if (res.error) {
+            updErr = res.error
+            if (this.isTagTypeMismatch(res.error)) continue
+            break
+          }
+          updated = res.data
+          updErr = null
+          break
+        }
+      }
 
       if (updErr) return
       if (updated && updated.length > 0) return
