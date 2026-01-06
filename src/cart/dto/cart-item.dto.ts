@@ -15,14 +15,10 @@ export class CartItemDto {
   @ApiProperty() @IsString() image!: string
   @ApiProperty() @IsString() color!: string
   @ApiProperty() @IsNumber() price!: number
-  @ApiProperty() @IsNumber() quantity!: number
+  @ApiProperty() @IsNumber() amount!: number
 
-  @ApiProperty() @IsString() product_tag!: string
-
-  @ApiPropertyOptional() @IsOptional() @IsNumber() meters?: number
-  @ApiPropertyOptional() @IsOptional() @IsString() size?: string
-
-  @ApiPropertyOptional() @IsOptional() @IsNumber() amount?: number
+  @ApiPropertyOptional() @IsOptional() @IsString() product_id?: string
+  @ApiPropertyOptional() @IsOptional() @IsString() product_tag?: string
   @ApiPropertyOptional() @IsOptional() @IsString() characteristic?: string
 
   @ApiProperty() @IsNumber() total!: number

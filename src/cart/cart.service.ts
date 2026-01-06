@@ -12,48 +12,37 @@ export class CartService {
     return code === 'PGRST202' || msg.toLowerCase().includes('could not find the function') || msg.toLowerCase().includes('function') && msg.toLowerCase().includes('does not exist')
   }
 
-  private isMissingColumn(err: any, column: string) {
-    const code = String(err?.code || '')
-    const msg = String(err?.message || '').toLowerCase()
-    return code === 'PGRST204' || msg.includes(`'${column.toLowerCase()}' column`) || msg.includes(`column "${column.toLowerCase()}"`) || msg.includes('does not exist') && msg.includes(column.toLowerCase())
-  }
+  private async getStock(ref: { productId?: string, productTag?: string }) {
+    const q = this.supabase.admin.from('products').select('amount')
+    const res = ref.productId
+      ? await q.eq('id', ref.productId).single()
+      : await q.eq('tag', ref.productTag as any).single()
 
-  private isStockSchemaMismatch(err: any) {
-    const code = String(err?.code || '')
-    const msg = String(err?.message || '').toLowerCase()
-    return code === '42703' || msg.includes('amount') && msg.includes('column')
-  }
-
-  private async getStock(productTag: string) {
-    const byAmount = await this.supabase.admin.from('products').select('amount').eq('tag', productTag).single()
-    if (!byAmount.error) return { column: 'amount' as const, currentRaw: (byAmount.data as any)?.amount }
-    if (!this.isMissingColumn(byAmount.error, 'amount')) {
-      const msg = String((byAmount.error as any)?.message || '')
+    if (res.error) {
+      const msg = String((res.error as any)?.message || '')
       throw new InternalServerErrorException(msg || 'Ошибка получения товара')
     }
 
-    const byMeters = await this.supabase.admin.from('products').select('meters').eq('tag', productTag).single()
-    if (byMeters.error) {
-      const msg = String((byMeters.error as any)?.message || '')
-      throw new InternalServerErrorException(msg || 'Ошибка получения товара')
-    }
-    return { column: 'meters' as const, currentRaw: (byMeters.data as any)?.meters }
+    return { currentRaw: (res.data as any)?.amount }
   }
 
-  private async decrementStock(productTag: string, dec: number) {
+  private async decrementStock(ref: { productId?: string, productTag?: string }, dec: number) {
     for (let attempt = 0; attempt < 5; attempt++) {
-      const { column, currentRaw } = await this.getStock(productTag)
+      const { currentRaw } = await this.getStock(ref)
       const current = Number(currentRaw ?? 0)
       if (!Number.isFinite(current)) throw new InternalServerErrorException('Некорректный остаток товара')
       if (current < dec) throw new ConflictException('Недостаточно товара на складе')
 
       const next = current - dec
-      const { data: updated, error: updErr } = await this.supabase.admin
+      const updBase = this.supabase.admin
         .from('products')
-        .update({ [column]: next } as any)
-        .eq('tag', productTag)
-        .eq(column, currentRaw as any)
-        .select(column)
+        .update({ amount: next } as any)
+        .eq('amount', currentRaw as any)
+        .select('amount')
+
+      const { data: updated, error: updErr } = ref.productId
+        ? await updBase.eq('id', ref.productId)
+        : await updBase.eq('tag', ref.productTag as any)
 
       if (updErr) {
         const msg = String((updErr as any)?.message || '')
@@ -68,27 +57,30 @@ export class CartService {
     throw new ConflictException('Не удалось обновить остаток. Попробуйте снова.')
   }
 
-  private async incrementStock(productTag: string, inc: number) {
-    if (!productTag || !Number.isFinite(inc) || inc <= 0) return
+  private async incrementStock(ref: { productId?: string, productTag?: string }, inc: number) {
+    if ((!ref.productId && !ref.productTag) || !Number.isFinite(inc) || inc <= 0) return
     for (let attempt = 0; attempt < 5; attempt++) {
-      let stock: { column: 'amount' | 'meters', currentRaw: any } | null = null
+      let stock: { currentRaw: any } | null = null
       try {
-        stock = await this.getStock(productTag)
+        stock = await this.getStock(ref)
       } catch (_) {
         return
       }
 
-      const { column, currentRaw } = stock
+      const { currentRaw } = stock
       const current = Number(currentRaw ?? 0)
       if (!Number.isFinite(current)) return
       const next = current + inc
 
-      const { data: updated, error: updErr } = await this.supabase.admin
+      const updBase = this.supabase.admin
         .from('products')
-        .update({ [column]: next } as any)
-        .eq('tag', productTag)
-        .eq(column, currentRaw as any)
-        .select(column)
+        .update({ amount: next } as any)
+        .eq('amount', currentRaw as any)
+        .select('amount')
+
+      const { data: updated, error: updErr } = ref.productId
+        ? await updBase.eq('id', ref.productId)
+        : await updBase.eq('tag', ref.productTag as any)
 
       if (updErr) return
       if (updated && updated.length > 0) return
@@ -109,32 +101,47 @@ export class CartService {
   }
 
   async add(uid: string, item: CartItemDto) {
+    const productId = String((item as any)?.product_id || '').trim()
     const productTag = String((item as any)?.product_tag || '').trim()
-    if (!productTag) throw new BadRequestException('product_tag is required')
-    const meters = Number((item as any)?.meters ?? 0)
-    const quantity = Number((item as any)?.quantity ?? 0)
-    const dec = Number.isFinite(meters) && meters > 0 ? meters : quantity
-    if (!Number.isFinite(dec) || dec <= 0) throw new BadRequestException('quantity must be > 0')
+    if (!productId && !productTag) throw new BadRequestException('product_id or product_tag is required')
+    const dec = Number((item as any)?.amount ?? (item as any)?.quantity ?? 0)
+    if (!Number.isFinite(dec) || dec <= 0) throw new BadRequestException('amount must be > 0')
     const cartTag = String((item as any)?.tag || '').trim()
     if (!cartTag) throw new BadRequestException('tag is required')
 
+    const normalized = {
+      name: (item as any)?.name,
+      description: (item as any)?.description,
+      type: (item as any)?.type,
+      image: String((item as any)?.image ?? ''),
+      color: String((item as any)?.color ?? ''),
+      price: Number((item as any)?.price ?? 0),
+      amount: dec,
+      product_id: productId || undefined,
+      product_tag: productTag || undefined,
+      characteristic: (item as any)?.characteristic,
+      total: Number((item as any)?.total ?? 0),
+      tag: cartTag,
+      createdAt: (item as any)?.createdAt,
+    }
+
     const { data, error } = await this.supabase.admin.rpc('cart_add_item', {
       p_user_id: uid,
-      p_item: item as any,
+      p_item: normalized as any,
       p_tag: cartTag,
     })
 
     if (error) {
-      if (this.isMissingRpc(error) || this.isStockSchemaMismatch(error)) {
-        await this.decrementStock(productTag, dec)
+      if (this.isMissingRpc(error)) {
+        await this.decrementStock({ productId: productId || undefined, productTag: productTag || undefined }, dec)
         const { data: inserted, error: insErr } = await this.supabase.admin
           .from('cart_items')
-          .insert({ user_id: uid, data: item as any, tag: cartTag })
+          .insert({ user_id: uid, data: normalized as any, tag: cartTag })
           .select()
           .single()
 
         if (insErr) {
-          await this.incrementStock(productTag, dec)
+          await this.incrementStock({ productId: productId || undefined, productTag: productTag || undefined }, dec)
           const msg = String((insErr as any)?.message || '')
           throw new InternalServerErrorException(msg || 'Ошибка добавления в корзину')
         }
@@ -159,7 +166,7 @@ export class CartService {
     })
 
     if (error) {
-      if (this.isMissingRpc(error) || this.isStockSchemaMismatch(error)) {
+      if (this.isMissingRpc(error)) {
         const { data: existing, error: exErr } = await this.supabase.admin
           .from('cart_items')
           .select('data')
@@ -170,10 +177,9 @@ export class CartService {
         if (exErr || !existing) return { ok: true }
 
         const payload = (existing as any)?.data ?? {}
+        const productId = String(payload?.product_id || '').trim()
         const productTag = String(payload?.product_tag || '').trim()
-        const meters = Number(payload?.meters ?? 0)
-        const quantity = Number(payload?.quantity ?? 0)
-        const inc = Number.isFinite(meters) && meters > 0 ? meters : quantity
+        const inc = Number(payload?.amount ?? payload?.quantity ?? 0)
 
         const { error: delErr } = await this.supabase.admin
           .from('cart_items')
@@ -186,7 +192,7 @@ export class CartService {
           throw new InternalServerErrorException(msg || 'Ошибка удаления из корзины')
         }
 
-        await this.incrementStock(productTag, inc)
+        await this.incrementStock({ productId: productId || undefined, productTag: productTag || undefined }, inc)
         return { ok: true }
       }
 
@@ -200,7 +206,7 @@ export class CartService {
   async clear(uid: string) {
     const { data, error } = await this.supabase.admin.rpc('cart_clear', { p_user_id: uid })
     if (error) {
-      if (this.isMissingRpc(error) || this.isStockSchemaMismatch(error)) {
+      if (this.isMissingRpc(error)) {
         const { data: rows, error: selErr } = await this.supabase.admin
           .from('cart_items')
           .select('data')
@@ -212,16 +218,20 @@ export class CartService {
           throw new InternalServerErrorException(msg || 'Ошибка очистки корзины')
         }
 
-        const totals = new Map<string, number>()
+        const totals = new Map<string, { ref: { productId?: string, productTag?: string }, inc: number }>()
         for (const r of rows || []) {
           const payload = (r as any)?.data ?? {}
+          const productId = String(payload?.product_id || '').trim()
           const productTag = String(payload?.product_tag || '').trim()
-          if (!productTag) continue
-          const meters = Number(payload?.meters ?? 0)
-          const quantity = Number(payload?.quantity ?? 0)
-          const inc = Number.isFinite(meters) && meters > 0 ? meters : quantity
+          if (!productId && !productTag) continue
+          const inc = Number(payload?.amount ?? payload?.quantity ?? 0)
           if (!Number.isFinite(inc) || inc <= 0) continue
-          totals.set(productTag, (totals.get(productTag) ?? 0) + inc)
+          const key = productId ? `id:${productId}` : `tag:${productTag}`
+          const prev = totals.get(key)
+          totals.set(key, {
+            ref: { productId: productId || undefined, productTag: productTag || undefined },
+            inc: (prev?.inc ?? 0) + inc,
+          })
         }
 
         const { error: delErr } = await this.supabase.admin.from('cart_items').delete().eq('user_id', uid)
@@ -230,8 +240,8 @@ export class CartService {
           throw new InternalServerErrorException(msg || 'Ошибка очистки корзины')
         }
 
-        for (const [productTag, inc] of totals.entries()) {
-          await this.incrementStock(productTag, inc)
+        for (const { ref, inc } of totals.values()) {
+          await this.incrementStock(ref, inc)
         }
 
         return { ok: true }
