@@ -12,6 +12,12 @@ export class CartService {
     return code === 'PGRST202' || msg.toLowerCase().includes('could not find the function') || msg.toLowerCase().includes('function') && msg.toLowerCase().includes('does not exist')
   }
 
+  private isRpcAuthMismatch(err: any) {
+    const code = String(err?.code || '')
+    const msg = String(err?.message || '').toLowerCase()
+    return code === '28000' || code === '42501' || msg.includes('unauthorized') || msg.includes('forbidden')
+  }
+
   private async getStock(ref: { productId?: string, productTag?: string }) {
     const q = this.supabase.admin.from('products').select('amount')
     const res = ref.productId
@@ -132,7 +138,7 @@ export class CartService {
     })
 
     if (error) {
-      if (this.isMissingRpc(error)) {
+      if (this.isMissingRpc(error) || this.isRpcAuthMismatch(error)) {
         await this.decrementStock({ productId: productId || undefined, productTag: productTag || undefined }, dec)
         const { data: inserted, error: insErr } = await this.supabase.admin
           .from('cart_items')
@@ -166,7 +172,7 @@ export class CartService {
     })
 
     if (error) {
-      if (this.isMissingRpc(error)) {
+      if (this.isMissingRpc(error) || this.isRpcAuthMismatch(error)) {
         const { data: existing, error: exErr } = await this.supabase.admin
           .from('cart_items')
           .select('data')
@@ -206,7 +212,7 @@ export class CartService {
   async clear(uid: string) {
     const { data, error } = await this.supabase.admin.rpc('cart_clear', { p_user_id: uid })
     if (error) {
-      if (this.isMissingRpc(error)) {
+      if (this.isMissingRpc(error) || this.isRpcAuthMismatch(error)) {
         const { data: rows, error: selErr } = await this.supabase.admin
           .from('cart_items')
           .select('data')
