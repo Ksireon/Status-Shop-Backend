@@ -23,7 +23,7 @@ export class CartItemDto {
   @ApiPropertyOptional() @IsOptional() @IsString() size?: string
 
   @ApiPropertyOptional() @IsOptional() @IsNumber() amount?: number
-  @ApiPropertyOptional() @IsOptional() @IsString() characteristic?: string
+  @ApiPropertyOptional() @IsOptional() @IsObject() characteristic?: Record<string, any>
 
   @ApiProperty() @IsNumber() total!: number
   @ApiProperty() @IsString() tag!: string

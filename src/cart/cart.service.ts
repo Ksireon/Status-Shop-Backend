@@ -12,32 +12,6 @@ export class CartService {
     private readonly cfg: ConfigService,
   ) {}
 
-  private stockColumn: 'amount' | null = null
-  private tagType: 'text' | 'json' | 'jsonb' | null = null
-
-  private normalizeTag(raw: unknown): string {
-    const s = String(raw ?? '').trim()
-    if (!s) return ''
-    if (
-      (s.startsWith('"') && s.endsWith('"')) ||
-      s.startsWith('{') ||
-      s.startsWith('[')
-    ) {
-      try {
-        const parsed = JSON.parse(s)
-        if (typeof parsed === 'string') return parsed.trim()
-        if (parsed && typeof parsed === 'object') {
-          const obj = parsed as Record<string, unknown>
-          for (const k of ['tag', 'value', 'en', 'ru', 'uz']) {
-            const v = obj[k]
-            if (typeof v === 'string' && v.trim()) return v.trim()
-          }
-        }
-      } catch (_) {}
-    }
-    return s
-  }
-
   private async makePgClient(dbUrl: string) {
     const u = new URL(dbUrl)
     const host = u.hostname
@@ -62,80 +36,6 @@ export class CartService {
     })
   }
 
-  private async resolveStockColumn(client: Client): Promise<'amount'> {
-    if (this.stockColumn) return this.stockColumn
-    const res = await client.query(
-      `
-        select column_name
-        from information_schema.columns
-        where table_schema = 'public'
-          and table_name = 'products'
-          and column_name = 'amount'
-      `
-    )
-    if ((res.rows || []).length === 0) throw new InternalServerErrorException('products.amount column not found')
-    this.stockColumn = 'amount'
-    return 'amount'
-  }
-
-  private async resolveTagType(client: Client): Promise<'text' | 'json' | 'jsonb'> {
-    if (this.tagType) return this.tagType
-    const res = await client.query(
-      `
-        select data_type
-        from information_schema.columns
-        where table_schema = 'public'
-          and table_name = 'products'
-          and column_name = 'tag'
-        limit 1
-      `
-    )
-    const dataType = String((res.rows?.[0] as any)?.data_type || '').toLowerCase()
-    const tagType = dataType === 'json' || dataType === 'jsonb' ? (dataType as 'json' | 'jsonb') : ('text' as const)
-    this.tagType = tagType
-    return tagType
-  }
-
-  private buildTagWhere(
-    tagType: 'text' | 'json' | 'jsonb',
-    productTagRaw: string,
-    startIndex: number,
-  ): { condition: string; params: any[]; nextIndex: number } {
-    const productTagText = this.normalizeTag(productTagRaw)
-    if (tagType === 'text') {
-      return { condition: `tag = $${startIndex}`, params: [productTagText], nextIndex: startIndex + 1 }
-    }
-
-    const textParamIndex = startIndex
-    const textParams: any[] = [productTagText]
-
-    const commonKeyMatches = [
-      `tag::jsonb #>> '{tag}' = $${textParamIndex}`,
-      `tag::jsonb #>> '{value}' = $${textParamIndex}`,
-      `tag::jsonb #>> '{en}' = $${textParamIndex}`,
-      `tag::jsonb #>> '{ru}' = $${textParamIndex}`,
-      `tag::jsonb #>> '{uz}' = $${textParamIndex}`,
-      `tag::jsonb #>> '{uk}' = $${textParamIndex}`,
-    ]
-
-    let jsonParam: string | null = null
-    try {
-      const parsed = JSON.parse(productTagRaw)
-      if (parsed && typeof parsed === 'object') {
-        jsonParam = JSON.stringify(parsed)
-      }
-    } catch (_) {}
-
-    if (!jsonParam) {
-      const condition = `((tag #>> '{}') = $${textParamIndex} OR ${commonKeyMatches.join(' OR ')})`
-      return { condition, params: textParams, nextIndex: startIndex + 1 }
-    }
-
-    const jsonParamIndex = startIndex + 1
-    const condition = `((tag #>> '{}') = $${textParamIndex} OR ${commonKeyMatches.join(' OR ')} OR tag::jsonb @> $${jsonParamIndex}::jsonb)`
-    return { condition, params: [...textParams, jsonParam], nextIndex: startIndex + 2 }
-  }
-
   async list(uid: string, opts: { page: number, limit: number }) {
     const from = (opts.page - 1) * opts.limit
     const to = from + opts.limit - 1
@@ -150,17 +50,28 @@ export class CartService {
   }
 
   async add(uid: string, item: CartItemDto) {
-    const productTag = this.normalizeTag((item as any)?.product_tag)
+    const productTag = String((item as any)?.product_tag || '').trim()
     if (!productTag) throw new BadRequestException('product_tag is required')
-    const cartTag = this.normalizeTag((item as any)?.tag)
-    if (!cartTag) throw new BadRequestException('tag is required')
     const meters = Number((item as any)?.meters ?? 0)
     const quantity = Number((item as any)?.quantity ?? 0)
     const dec = Number.isFinite(meters) && meters > 0 ? meters : quantity
     if (!Number.isFinite(dec) || dec <= 0) throw new BadRequestException('quantity must be > 0')
 
+    const rpc = await this.supabase.admin.rpc('cart_add_item', { p_user_id: uid, p_item: item as any })
+    if (!rpc.error && rpc.data) return rpc.data
+    if (rpc.error) {
+      const msg = String((rpc.error as any).message || '')
+      if (msg.includes('Недостаточно товара') || msg.toLowerCase().includes('insufficient')) {
+        throw new ConflictException('Недостаточно товара на складе')
+      }
+      const lowered = msg.toLowerCase()
+      if (!lowered.includes('could not find the function') && !lowered.includes('function') && !lowered.includes('rpc')) {
+        throw new InternalServerErrorException(msg || 'Cart RPC error')
+      }
+    }
+
     const dbUrl = this.cfg.get('SUPABASE_DB_URL')
-    if (!dbUrl) throw new InternalServerErrorException('SUPABASE_DB_URL не настроен')
+    if (!dbUrl) throw new InternalServerErrorException('Cart RPC не настроен и SUPABASE_DB_URL не задан')
 
     const client = await this.makePgClient(dbUrl)
     await client.connect()
@@ -170,18 +81,14 @@ export class CartService {
       await client.query('begin')
       didBegin = true
 
-      const stockCol = await this.resolveStockColumn(client)
-      const tagType = await this.resolveTagType(client)
-      const tagWhere = this.buildTagWhere(tagType, productTag, 1)
-      const decParamIndex = tagWhere.nextIndex
       const updated = await client.query(
         `
           update public.products
-          set ${stockCol} = ${stockCol} - $${decParamIndex}
-          where ${tagWhere.condition} and ${stockCol} >= $${decParamIndex}
-          returning ${stockCol}
+          set amount = amount - $2
+          where tag = $1 and amount >= $2
+          returning amount
         `,
-        [...tagWhere.params, dec]
+        [productTag, dec]
       )
 
       if (updated.rowCount === 0) {
@@ -194,7 +101,7 @@ export class CartService {
           values ($1, $2::jsonb, $3, now())
           returning *
         `,
-        [uid, JSON.stringify(item), cartTag]
+        [uid, JSON.stringify(item), item.tag]
       )
 
       await client.query('commit')
@@ -211,8 +118,11 @@ export class CartService {
   }
 
   async remove(uid: string, tag: string) {
+    const rpc = await this.supabase.admin.rpc('cart_remove_item', { p_user_id: uid, p_tag: tag })
+    if (!rpc.error) return { ok: true }
+
     const dbUrl = this.cfg.get('SUPABASE_DB_URL')
-    if (!dbUrl) throw new InternalServerErrorException('SUPABASE_DB_URL не настроен')
+    if (!dbUrl) throw new InternalServerErrorException('Cart RPC не настроен и SUPABASE_DB_URL не задан')
     const client = await this.makePgClient(dbUrl)
     await client.connect()
 
@@ -220,9 +130,6 @@ export class CartService {
     try {
       await client.query('begin')
       didBegin = true
-
-      const stockCol = await this.resolveStockColumn(client)
-      const tagType = await this.resolveTagType(client)
 
       const existing = await client.query(
         `select data from public.cart_items where user_id = $1 and tag = $2 for update`,
@@ -236,7 +143,7 @@ export class CartService {
       }
 
       const data = (existing.rows[0] as any)?.data ?? {}
-      const productTag = this.normalizeTag((data as any)?.product_tag)
+      const productTag = String((data as any)?.product_tag || '').trim()
       const meters = Number((data as any)?.meters ?? 0)
       const quantity = Number((data as any)?.quantity ?? 0)
       const inc = Number.isFinite(meters) && meters > 0 ? meters : quantity
@@ -244,11 +151,9 @@ export class CartService {
       await client.query(`delete from public.cart_items where user_id = $1 and tag = $2`, [uid, tag])
 
       if (productTag && Number.isFinite(inc) && inc > 0) {
-        const tagWhere = this.buildTagWhere(tagType, productTag, 1)
-        const incParamIndex = tagWhere.nextIndex
         await client.query(
-          `update public.products set ${stockCol} = ${stockCol} + $${incParamIndex} where ${tagWhere.condition}`,
-          [...tagWhere.params, inc]
+          `update public.products set amount = amount + $2 where tag = $1`,
+          [productTag, inc]
         )
       }
 
@@ -276,16 +181,13 @@ export class CartService {
       await client.query('begin')
       didBegin = true
 
-      const stockCol = await this.resolveStockColumn(client)
-      const tagType = await this.resolveTagType(client)
-
       const existing = await client.query(`select data from public.cart_items where user_id = $1 for update`, [uid])
       await client.query(`delete from public.cart_items where user_id = $1`, [uid])
 
       const totals = new Map<string, number>()
       for (const r of existing.rows || []) {
         const data = (r as any)?.data ?? {}
-        const productTag = this.normalizeTag((data as any)?.product_tag)
+        const productTag = String((data as any)?.product_tag || '').trim()
         if (!productTag) continue
         const meters = Number((data as any)?.meters ?? 0)
         const quantity = Number((data as any)?.quantity ?? 0)
@@ -295,11 +197,9 @@ export class CartService {
       }
 
       for (const [productTag, inc] of totals.entries()) {
-        const tagWhere = this.buildTagWhere(tagType, productTag, 1)
-        const incParamIndex = tagWhere.nextIndex
         await client.query(
-          `update public.products set ${stockCol} = ${stockCol} + $${incParamIndex} where ${tagWhere.condition}`,
-          [...tagWhere.params, inc]
+          `update public.products set amount = amount + $2 where tag = $1`,
+          [productTag, inc]
         )
       }
 
