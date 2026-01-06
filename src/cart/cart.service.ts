@@ -1,39 +1,82 @@
 import { BadRequestException, ConflictException, Injectable, InternalServerErrorException } from '@nestjs/common'
-import { Client } from 'pg'
-import { resolve4 } from 'node:dns/promises'
 import { SupabaseService } from '../supabase/supabase.service'
 import { CartItemDto } from './dto/cart-item.dto'
-import { ConfigService } from '../config/config.service'
 
 @Injectable()
 export class CartService {
-  constructor(
-    private readonly supabase: SupabaseService,
-    private readonly cfg: ConfigService,
-  ) {}
+  constructor(private readonly supabase: SupabaseService) {}
 
-  private async makePgClient(dbUrl: string) {
-    const u = new URL(dbUrl)
-    const host = u.hostname
-    const port = u.port ? Number(u.port) : 5432
-    const user = decodeURIComponent(u.username || '')
-    const password = decodeURIComponent(u.password || '')
-    const database = (u.pathname || '').replace(/^\//, '') || 'postgres'
+  private isMissingRpc(err: any) {
+    const code = String(err?.code || '')
+    const msg = String(err?.message || '')
+    return code === 'PGRST202' || msg.toLowerCase().includes('could not find the function') || msg.toLowerCase().includes('function') && msg.toLowerCase().includes('does not exist')
+  }
 
-    let hostIp = host
-    try {
-      const ips = await resolve4(host)
-      if (ips && ips.length > 0) hostIp = ips[0]
-    } catch (_) {}
+  private async decrementStock(productTag: string, dec: number) {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const { data: prod, error: prodErr } = await this.supabase.admin
+        .from('products')
+        .select('amount')
+        .eq('tag', productTag)
+        .single()
 
-    return new Client({
-      host: hostIp,
-      port,
-      user,
-      password,
-      database,
-      ssl: { rejectUnauthorized: false },
-    })
+      if (prodErr) {
+        const msg = String((prodErr as any)?.message || '')
+        throw new InternalServerErrorException(msg || 'Ошибка получения товара')
+      }
+
+      const currentRaw = (prod as any)?.amount
+      const current = Number(currentRaw ?? 0)
+      if (!Number.isFinite(current)) throw new InternalServerErrorException('Некорректный остаток товара')
+      if (current < dec) throw new ConflictException('Недостаточно товара на складе')
+
+      const next = current - dec
+      const { data: updated, error: updErr } = await this.supabase.admin
+        .from('products')
+        .update({ amount: next })
+        .eq('tag', productTag)
+        .eq('amount', currentRaw)
+        .select('amount')
+
+      if (updErr) {
+        const msg = String((updErr as any)?.message || '')
+        throw new InternalServerErrorException(msg || 'Ошибка обновления остатка')
+      }
+
+      if (updated && updated.length > 0) {
+        return { previousAmount: currentRaw, nextAmount: next }
+      }
+    }
+
+    throw new ConflictException('Не удалось обновить остаток. Попробуйте снова.')
+  }
+
+  private async incrementStock(productTag: string, inc: number) {
+    if (!productTag || !Number.isFinite(inc) || inc <= 0) return
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const { data: prod, error: prodErr } = await this.supabase.admin
+        .from('products')
+        .select('amount')
+        .eq('tag', productTag)
+        .single()
+
+      if (prodErr) return
+
+      const currentRaw = (prod as any)?.amount
+      const current = Number(currentRaw ?? 0)
+      if (!Number.isFinite(current)) return
+      const next = current + inc
+
+      const { data: updated, error: updErr } = await this.supabase.admin
+        .from('products')
+        .update({ amount: next })
+        .eq('tag', productTag)
+        .eq('amount', currentRaw)
+        .select('amount')
+
+      if (updErr) return
+      if (updated && updated.length > 0) return
+    }
   }
 
   async list(uid: string, opts: { page: number, limit: number }) {
@@ -56,163 +99,131 @@ export class CartService {
     const quantity = Number((item as any)?.quantity ?? 0)
     const dec = Number.isFinite(meters) && meters > 0 ? meters : quantity
     if (!Number.isFinite(dec) || dec <= 0) throw new BadRequestException('quantity must be > 0')
+    const cartTag = String((item as any)?.tag || '').trim()
+    if (!cartTag) throw new BadRequestException('tag is required')
 
-    const rpc = await this.supabase.admin.rpc('cart_add_item', { p_user_id: uid, p_item: item as any })
-    if (!rpc.error && rpc.data) return rpc.data
-    if (rpc.error) {
-      const msg = String((rpc.error as any).message || '')
-      if (msg.includes('Недостаточно товара') || msg.toLowerCase().includes('insufficient')) {
-        throw new ConflictException('Недостаточно товара на складе')
+    const { data, error } = await this.supabase.admin.rpc('cart_add_item', {
+      p_user_id: uid,
+      p_item: item as any,
+      p_tag: cartTag,
+    })
+
+    if (error) {
+      if (this.isMissingRpc(error)) {
+        const stock = await this.decrementStock(productTag, dec)
+        const { data: inserted, error: insErr } = await this.supabase.admin
+          .from('cart_items')
+          .insert({ user_id: uid, data: item as any, tag: cartTag })
+          .select()
+          .single()
+
+        if (insErr) {
+          await this.incrementStock(productTag, dec)
+          const msg = String((insErr as any)?.message || '')
+          throw new InternalServerErrorException(msg || 'Ошибка добавления в корзину')
+        }
+
+        return inserted
       }
-      const lowered = msg.toLowerCase()
-      if (!lowered.includes('could not find the function') && !lowered.includes('function') && !lowered.includes('rpc')) {
-        throw new InternalServerErrorException(msg || 'Cart RPC error')
-      }
+
+      const code = (error as any)?.code as string | undefined
+      const msg = String((error as any)?.message || '')
+      if (code === '23514' || msg.includes('Недостаточно')) throw new ConflictException('Недостаточно товара на складе')
+      if (code === '22023') throw new BadRequestException(msg || 'Bad request')
+      throw new InternalServerErrorException(msg || 'Ошибка добавления в корзину')
     }
 
-    const dbUrl = this.cfg.get('SUPABASE_DB_URL')
-    if (!dbUrl) throw new InternalServerErrorException('Cart RPC не настроен и SUPABASE_DB_URL не задан')
-
-    const client = await this.makePgClient(dbUrl)
-    await client.connect()
-
-    let didBegin = false
-    try {
-      await client.query('begin')
-      didBegin = true
-
-      const updated = await client.query(
-        `
-          update public.products
-          set amount = amount - $2
-          where tag = $1 and amount >= $2
-          returning amount
-        `,
-        [productTag, dec]
-      )
-
-      if (updated.rowCount === 0) {
-        throw new ConflictException('Недостаточно товара на складе')
-      }
-
-      const inserted = await client.query(
-        `
-          insert into public.cart_items (user_id, data, tag, created_at)
-          values ($1, $2::jsonb, $3, now())
-          returning *
-        `,
-        [uid, JSON.stringify(item), item.tag]
-      )
-
-      await client.query('commit')
-      didBegin = false
-      return inserted.rows[0]
-    } catch (e) {
-      if (didBegin) {
-        try { await client.query('rollback') } catch (_) {}
-      }
-      throw e
-    } finally {
-      await client.end()
-    }
+    return data
   }
 
   async remove(uid: string, tag: string) {
-    const rpc = await this.supabase.admin.rpc('cart_remove_item', { p_user_id: uid, p_tag: tag })
-    if (!rpc.error) return { ok: true }
+    const { data, error } = await this.supabase.admin.rpc('cart_remove_item', {
+      p_user_id: uid,
+      p_tag: tag,
+    })
 
-    const dbUrl = this.cfg.get('SUPABASE_DB_URL')
-    if (!dbUrl) throw new InternalServerErrorException('Cart RPC не настроен и SUPABASE_DB_URL не задан')
-    const client = await this.makePgClient(dbUrl)
-    await client.connect()
+    if (error) {
+      if (this.isMissingRpc(error)) {
+        const { data: existing, error: exErr } = await this.supabase.admin
+          .from('cart_items')
+          .select('data')
+          .eq('user_id', uid)
+          .eq('tag', tag)
+          .single()
 
-    let didBegin = false
-    try {
-      await client.query('begin')
-      didBegin = true
+        if (exErr || !existing) return { ok: true }
 
-      const existing = await client.query(
-        `select data from public.cart_items where user_id = $1 and tag = $2 for update`,
-        [uid, tag]
-      )
+        const payload = (existing as any)?.data ?? {}
+        const productTag = String(payload?.product_tag || '').trim()
+        const meters = Number(payload?.meters ?? 0)
+        const quantity = Number(payload?.quantity ?? 0)
+        const inc = Number.isFinite(meters) && meters > 0 ? meters : quantity
 
-      if (existing.rowCount === 0) {
-        await client.query('commit')
-        didBegin = false
+        const { error: delErr } = await this.supabase.admin
+          .from('cart_items')
+          .delete()
+          .eq('user_id', uid)
+          .eq('tag', tag)
+
+        if (delErr) {
+          const msg = String((delErr as any)?.message || '')
+          throw new InternalServerErrorException(msg || 'Ошибка удаления из корзины')
+        }
+
+        await this.incrementStock(productTag, inc)
         return { ok: true }
       }
 
-      const data = (existing.rows[0] as any)?.data ?? {}
-      const productTag = String((data as any)?.product_tag || '').trim()
-      const meters = Number((data as any)?.meters ?? 0)
-      const quantity = Number((data as any)?.quantity ?? 0)
-      const inc = Number.isFinite(meters) && meters > 0 ? meters : quantity
-
-      await client.query(`delete from public.cart_items where user_id = $1 and tag = $2`, [uid, tag])
-
-      if (productTag && Number.isFinite(inc) && inc > 0) {
-        await client.query(
-          `update public.products set amount = amount + $2 where tag = $1`,
-          [productTag, inc]
-        )
-      }
-
-      await client.query('commit')
-      didBegin = false
-      return { ok: true }
-    } catch (e) {
-      if (didBegin) {
-        try { await client.query('rollback') } catch (_) {}
-      }
-      throw e
-    } finally {
-      await client.end()
+      const msg = String((error as any)?.message || '')
+      throw new InternalServerErrorException(msg || 'Ошибка удаления из корзины')
     }
+
+    return data ?? { ok: true }
   }
 
   async clear(uid: string) {
-    const dbUrl = this.cfg.get('SUPABASE_DB_URL')
-    if (!dbUrl) throw new InternalServerErrorException('SUPABASE_DB_URL не настроен')
-    const client = await this.makePgClient(dbUrl)
-    await client.connect()
+    const { data, error } = await this.supabase.admin.rpc('cart_clear', { p_user_id: uid })
+    if (error) {
+      if (this.isMissingRpc(error)) {
+        const { data: rows, error: selErr } = await this.supabase.admin
+          .from('cart_items')
+          .select('data')
+          .eq('user_id', uid)
+          .limit(1000)
 
-    let didBegin = false
-    try {
-      await client.query('begin')
-      didBegin = true
+        if (selErr) {
+          const msg = String((selErr as any)?.message || '')
+          throw new InternalServerErrorException(msg || 'Ошибка очистки корзины')
+        }
 
-      const existing = await client.query(`select data from public.cart_items where user_id = $1 for update`, [uid])
-      await client.query(`delete from public.cart_items where user_id = $1`, [uid])
+        const totals = new Map<string, number>()
+        for (const r of rows || []) {
+          const payload = (r as any)?.data ?? {}
+          const productTag = String(payload?.product_tag || '').trim()
+          if (!productTag) continue
+          const meters = Number(payload?.meters ?? 0)
+          const quantity = Number(payload?.quantity ?? 0)
+          const inc = Number.isFinite(meters) && meters > 0 ? meters : quantity
+          if (!Number.isFinite(inc) || inc <= 0) continue
+          totals.set(productTag, (totals.get(productTag) ?? 0) + inc)
+        }
 
-      const totals = new Map<string, number>()
-      for (const r of existing.rows || []) {
-        const data = (r as any)?.data ?? {}
-        const productTag = String((data as any)?.product_tag || '').trim()
-        if (!productTag) continue
-        const meters = Number((data as any)?.meters ?? 0)
-        const quantity = Number((data as any)?.quantity ?? 0)
-        const inc = Number.isFinite(meters) && meters > 0 ? meters : quantity
-        if (!Number.isFinite(inc) || inc <= 0) continue
-        totals.set(productTag, (totals.get(productTag) ?? 0) + inc)
+        const { error: delErr } = await this.supabase.admin.from('cart_items').delete().eq('user_id', uid)
+        if (delErr) {
+          const msg = String((delErr as any)?.message || '')
+          throw new InternalServerErrorException(msg || 'Ошибка очистки корзины')
+        }
+
+        for (const [productTag, inc] of totals.entries()) {
+          await this.incrementStock(productTag, inc)
+        }
+
+        return { ok: true }
       }
 
-      for (const [productTag, inc] of totals.entries()) {
-        await client.query(
-          `update public.products set amount = amount + $2 where tag = $1`,
-          [productTag, inc]
-        )
-      }
-
-      await client.query('commit')
-      didBegin = false
-      return { ok: true }
-    } catch (e) {
-      if (didBegin) {
-        try { await client.query('rollback') } catch (_) {}
-      }
-      throw e
-    } finally {
-      await client.end()
+      const msg = String((error as any)?.message || '')
+      throw new InternalServerErrorException(msg || 'Ошибка очистки корзины')
     }
+    return data ?? { ok: true }
   }
 }
