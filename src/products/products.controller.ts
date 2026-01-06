@@ -14,6 +14,12 @@ export class ProductsController {
     const o = order === 'desc' ? 'desc' : 'asc'
     return this.service.list({ page: p, limit: l, sort: s, order: o })
   }
+
+  @Get('stock')
+  stockByTag(@Query('tag') tag?: string) {
+    return this.service.stockByTag(tag)
+  }
+
   @Post()
   create(@Body() body: any) {
     return this.service.create(body)
