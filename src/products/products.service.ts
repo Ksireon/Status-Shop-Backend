@@ -70,14 +70,15 @@ export class ProductsService {
     return data
   }
 
-  async getStockByTag(tag: string) {
-    const t = String(tag || '').trim()
-    if (!t) throw new BadRequestException('tag is required')
+  async getStock(input: { tag?: string, id?: string }) {
+    const id = String(input?.id || '').trim()
+    const tag = String(input?.tag || '').trim()
+    if (!id && !tag) throw new BadRequestException('id or tag is required')
 
     const { data, error } = await this.supabase.admin
       .from('products')
       .select('amount')
-      .eq('tag', t)
+      .eq(id ? 'id' : 'tag', (id || tag) as any)
       .limit(1)
       .maybeSingle()
 

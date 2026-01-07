@@ -131,38 +131,21 @@ export class CartService {
       createdAt: (item as any)?.createdAt,
     }
 
-    const { data, error } = await this.supabase.admin.rpc('cart_add_item', {
-      p_user_id: uid,
-      p_item: normalized as any,
-      p_tag: cartTag,
-    })
+    await this.decrementStock({ productId: productId || undefined, productTag: productTag || undefined }, dec)
 
-    if (error) {
-      if (this.isMissingRpc(error) || this.isRpcAuthMismatch(error)) {
-        await this.decrementStock({ productId: productId || undefined, productTag: productTag || undefined }, dec)
-        const { data: inserted, error: insErr } = await this.supabase.admin
-          .from('cart_items')
-          .insert({ user_id: uid, data: normalized as any, tag: cartTag })
-          .select()
-          .single()
+    const { data: inserted, error: insErr } = await this.supabase.admin
+      .from('cart_items')
+      .insert({ user_id: uid, data: normalized as any, tag: cartTag })
+      .select()
+      .single()
 
-        if (insErr) {
-          await this.incrementStock({ productId: productId || undefined, productTag: productTag || undefined }, dec)
-          const msg = String((insErr as any)?.message || '')
-          throw new InternalServerErrorException(msg || 'Ошибка добавления в корзину')
-        }
-
-        return inserted
-      }
-
-      const code = (error as any)?.code as string | undefined
-      const msg = String((error as any)?.message || '')
-      if (code === '23514' || msg.includes('Недостаточно')) throw new ConflictException('Недостаточно товара на складе')
-      if (code === '22023') throw new BadRequestException(msg || 'Bad request')
+    if (insErr) {
+      await this.incrementStock({ productId: productId || undefined, productTag: productTag || undefined }, dec)
+      const msg = String((insErr as any)?.message || '')
       throw new InternalServerErrorException(msg || 'Ошибка добавления в корзину')
     }
 
-    return data
+    return inserted
   }
 
   async remove(uid: string, tag: string) {

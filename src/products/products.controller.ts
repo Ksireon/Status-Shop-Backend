@@ -7,8 +7,8 @@ import { ProductsService } from './products.service'
 export class ProductsController {
   constructor(private readonly service: ProductsService) {}
   @Get('stock')
-  stock(@Query('tag') tag?: string) {
-    return this.service.getStockByTag(tag ?? '')
+  stock(@Query('tag') tag?: string, @Query('id') id?: string) {
+    return this.service.getStock({ tag, id })
   }
   @Get()
   list(@Query('page') page?: string, @Query('limit') limit?: string, @Query('sort') sort?: string, @Query('order') order?: string) {
