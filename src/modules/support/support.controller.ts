@@ -20,7 +20,10 @@ export class SupportController {
   }
 
   @Post('messages')
-  async send(@CurrentUser() user: JwtUser, @Body() dto: CreateSupportMessageDto): Promise<SupportMessageDto> {
+  async send(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: CreateSupportMessageDto,
+  ): Promise<SupportMessageDto> {
     return this.support.sendUserMessage(user.sub, dto.text);
   }
 }

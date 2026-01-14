@@ -12,4 +12,3 @@ export class UpdateOrderPaymentDto {
   @IsString()
   adminNotes?: string;
 }
-

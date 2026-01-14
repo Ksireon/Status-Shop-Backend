@@ -25,4 +25,3 @@ export class SupportChatFilterDto {
   @Min(1)
   take?: number;
 }
-

@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
@@ -55,7 +59,10 @@ export class CategoriesService {
   }
 
   async adminCreate(dto: CreateCategoryDto) {
-    const exists = await this.prisma.category.findUnique({ where: { key: dto.key }, select: { id: true } });
+    const exists = await this.prisma.category.findUnique({
+      where: { key: dto.key },
+      select: { id: true },
+    });
     if (exists) throw new ConflictException('Category key already exists');
 
     const c = await this.prisma.category.create({
@@ -74,12 +81,19 @@ export class CategoriesService {
   }
 
   async adminUpdate(id: string, dto: UpdateCategoryDto) {
-    const c = await this.prisma.category.findUnique({ where: { id }, select: { id: true } });
+    const c = await this.prisma.category.findUnique({
+      where: { id },
+      select: { id: true },
+    });
     if (!c) throw new NotFoundException('Category not found');
 
     if (dto.key) {
-      const other = await this.prisma.category.findUnique({ where: { key: dto.key }, select: { id: true } });
-      if (other && other.id !== id) throw new ConflictException('Category key already exists');
+      const other = await this.prisma.category.findUnique({
+        where: { key: dto.key },
+        select: { id: true },
+      });
+      if (other && other.id !== id)
+        throw new ConflictException('Category key already exists');
     }
 
     await this.prisma.category.update({
@@ -99,9 +113,15 @@ export class CategoriesService {
   }
 
   async adminDelete(id: string) {
-    const c = await this.prisma.category.findUnique({ where: { id }, select: { id: true } });
+    const c = await this.prisma.category.findUnique({
+      where: { id },
+      select: { id: true },
+    });
     if (!c) throw new NotFoundException('Category not found');
-    await this.prisma.category.update({ where: { id }, data: { isActive: false } });
+    await this.prisma.category.update({
+      where: { id },
+      data: { isActive: false },
+    });
     return { ok: true };
   }
 }

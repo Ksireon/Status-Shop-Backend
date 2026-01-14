@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { UserRole } from '@prisma/client';
@@ -52,15 +56,25 @@ export class AuthService {
   async login(dto: LoginDto, meta?: SessionMeta) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
-      select: { id: true, email: true, role: true, passwordHash: true, isActive: true },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        passwordHash: true,
+        isActive: true,
+      },
     });
 
-    if (!user || !user.isActive) throw new UnauthorizedException('Invalid credentials');
+    if (!user || !user.isActive)
+      throw new UnauthorizedException('Invalid credentials');
 
     const ok = await bcrypt.compare(dto.password, user.passwordHash);
     if (!ok) throw new UnauthorizedException('Invalid credentials');
 
-    return this.issueTokens({ id: user.id, email: user.email, role: user.role }, meta);
+    return this.issueTokens(
+      { id: user.id, email: user.email, role: user.role },
+      meta,
+    );
   }
 
   async refresh(refreshToken: string, meta?: SessionMeta) {
@@ -68,7 +82,9 @@ export class AuthService {
 
     const session = await this.prisma.session.findUnique({
       where: { refreshTokenHash: tokenHash },
-      include: { user: { select: { id: true, email: true, role: true, isActive: true } } },
+      include: {
+        user: { select: { id: true, email: true, role: true, isActive: true } },
+      },
     });
 
     if (!session) throw new UnauthorizedException('Invalid refresh token');
@@ -79,8 +95,10 @@ export class AuthService {
       });
       throw new UnauthorizedException('Refresh token reuse detected');
     }
-    if (session.expiresAt.getTime() <= Date.now()) throw new UnauthorizedException('Refresh token expired');
-    if (!session.user.isActive) throw new UnauthorizedException('User is inactive');
+    if (session.expiresAt.getTime() <= Date.now())
+      throw new UnauthorizedException('Refresh token expired');
+    if (!session.user.isActive)
+      throw new UnauthorizedException('User is inactive');
 
     const next = await this.createSession(session.userId, meta);
 
@@ -100,13 +118,21 @@ export class AuthService {
 
   async logout(refreshToken: string) {
     const tokenHash = this.hashRefreshToken(refreshToken);
-    const session = await this.prisma.session.findUnique({ where: { refreshTokenHash: tokenHash } });
+    const session = await this.prisma.session.findUnique({
+      where: { refreshTokenHash: tokenHash },
+    });
     if (!session) return;
     if (session.revokedAt) return;
-    await this.prisma.session.update({ where: { id: session.id }, data: { revokedAt: new Date() } });
+    await this.prisma.session.update({
+      where: { id: session.id },
+      data: { revokedAt: new Date() },
+    });
   }
 
-  private async issueTokens(user: { id: string; email: string; role: UserRole }, meta?: SessionMeta) {
+  private async issueTokens(
+    user: { id: string; email: string; role: UserRole },
+    meta?: SessionMeta,
+  ) {
     const [accessToken, refresh] = await Promise.all([
       this.signAccessToken(user),
       this.createSession(user.id, meta),
@@ -114,7 +140,11 @@ export class AuthService {
     return { accessToken, refreshToken: refresh.refreshToken };
   }
 
-  private async signAccessToken(user: { id: string; email: string; role: UserRole }) {
+  private async signAccessToken(user: {
+    id: string;
+    email: string;
+    role: UserRole;
+  }) {
     const payload = {
       email: user.email,
       role: user.role,
@@ -132,8 +162,13 @@ export class AuthService {
   }
 
   private hashRefreshToken(token: string) {
-    const secret = this.config.get<string>('REFRESH_TOKEN_SECRET') || this.config.getOrThrow<string>('JWT_SECRET');
-    return crypto.createHash('sha256').update(`${token}.${secret}`).digest('hex');
+    const secret =
+      this.config.get<string>('REFRESH_TOKEN_SECRET') ||
+      this.config.getOrThrow<string>('JWT_SECRET');
+    return crypto
+      .createHash('sha256')
+      .update(`${token}.${secret}`)
+      .digest('hex');
   }
 
   private refreshExpiresAt() {

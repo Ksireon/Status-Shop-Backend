@@ -16,4 +16,3 @@ export class CategoryDto {
   @ApiProperty()
   sortOrder: number;
 }
-

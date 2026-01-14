@@ -13,4 +13,3 @@ export class UpdateSupportChatDto {
   @IsString()
   assignedTo?: string;
 }
-

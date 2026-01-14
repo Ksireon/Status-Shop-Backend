@@ -19,4 +19,3 @@ export class ProductsController {
     return this.products.getById(id);
   }
 }
-

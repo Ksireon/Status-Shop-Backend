@@ -20,7 +20,10 @@ export class UsersController {
   }
 
   @Patch('me')
-  async updateMe(@CurrentUser() user: JwtUser, @Body() dto: UpdateMeDto): Promise<UserDto> {
+  async updateMe(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: UpdateMeDto,
+  ): Promise<UserDto> {
     return this.users.updateMe(user.sub, dto);
   }
 }

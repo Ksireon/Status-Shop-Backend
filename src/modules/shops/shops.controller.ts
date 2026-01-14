@@ -13,4 +13,3 @@ export class ShopsController {
     return this.shops.list();
   }
 }
-

@@ -1,6 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { OrderStatus, PaymentStatus } from '@prisma/client';
-import { IsEnum, IsInt, IsISO8601, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsISO8601,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class OrderFilterDto {
   @ApiPropertyOptional({ enum: OrderStatus })
@@ -40,4 +47,3 @@ export class OrderFilterDto {
   @Min(1)
   take?: number;
 }
-

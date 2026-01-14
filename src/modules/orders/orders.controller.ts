@@ -15,7 +15,10 @@ export class OrdersController {
   constructor(private readonly orders: OrdersService) {}
 
   @Post()
-  async create(@CurrentUser() user: JwtUser, @Body() dto: CreateOrderDto): Promise<OrderDto> {
+  async create(
+    @CurrentUser() user: JwtUser,
+    @Body() dto: CreateOrderDto,
+  ): Promise<OrderDto> {
     return this.orders.create(user.sub, dto);
   }
 
@@ -25,7 +28,10 @@ export class OrdersController {
   }
 
   @Get(':id')
-  async get(@CurrentUser() user: JwtUser, @Param('id') id: string): Promise<OrderDto> {
+  async get(
+    @CurrentUser() user: JwtUser,
+    @Param('id') id: string,
+  ): Promise<OrderDto> {
     return this.orders.getMy(user.sub, id);
   }
 }

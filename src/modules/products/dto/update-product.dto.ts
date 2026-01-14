@@ -109,4 +109,3 @@ export class UpdateProductDto {
   @Min(0)
   sortOrder?: number;
 }
-

@@ -34,4 +34,3 @@ export class ProductDto {
   @ApiProperty()
   isFeatured: boolean;
 }
-

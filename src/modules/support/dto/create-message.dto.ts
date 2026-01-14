@@ -7,4 +7,3 @@ export class CreateSupportMessageDto {
   @MinLength(1)
   text: string;
 }
-

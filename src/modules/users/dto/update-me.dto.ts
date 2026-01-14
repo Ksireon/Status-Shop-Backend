@@ -32,4 +32,3 @@ export class UpdateMeDto {
   @IsString()
   phone?: string;
 }
-

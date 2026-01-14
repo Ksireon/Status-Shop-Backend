@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
@@ -30,13 +40,20 @@ export class UsersAdminController {
   }
 
   @Patch(':id')
-  async update(@CurrentUser() current: JwtUser, @Param('id') id: string, @Body() dto: AdminUpdateUserDto) {
+  async update(
+    @CurrentUser() current: JwtUser,
+    @Param('id') id: string,
+    @Body() dto: AdminUpdateUserDto,
+  ) {
     return this.users.adminUpdate(current, id, dto);
   }
 
   @Post()
   @Roles(UserRole.ADMIN)
-  async create(@CurrentUser() current: JwtUser, @Body() dto: AdminCreateUserDto) {
+  async create(
+    @CurrentUser() current: JwtUser,
+    @Body() dto: AdminCreateUserDto,
+  ) {
     return this.users.adminCreate(current, dto);
   }
 

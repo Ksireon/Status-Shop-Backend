@@ -37,4 +37,3 @@ export class RegisterDto {
   @IsString()
   phone: string;
 }
-

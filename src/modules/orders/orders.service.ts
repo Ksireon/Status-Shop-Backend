@@ -1,5 +1,14 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DeliveryType, OrderStatus, PaymentStatus, Prisma } from '@prisma/client';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  DeliveryType,
+  OrderStatus,
+  PaymentStatus,
+  Prisma,
+} from '@prisma/client';
 import { decimalToNumber } from '../../common/prisma/decimal';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -38,56 +47,80 @@ export class OrdersService {
     const byId = new Map(products.map((p) => [p.id, p]));
 
     let subtotal = new Prisma.Decimal(0);
-    const itemsData: Prisma.OrderItemCreateWithoutOrderInput[] = dto.items.map((i) => {
-      const product = byId.get(i.productId)!;
+    const itemsData: Prisma.OrderItemCreateWithoutOrderInput[] = dto.items.map(
+      (i) => {
+        const product = byId.get(i.productId)!;
 
-      const qty = new Prisma.Decimal(i.quantity);
-      const metersValue = i.meters !== undefined && i.meters !== null ? Number(i.meters) : null;
-      const meters = metersValue !== null ? new Prisma.Decimal(metersValue) : null;
+        const qty = new Prisma.Decimal(i.quantity);
+        const metersValue =
+          i.meters !== undefined && i.meters !== null ? Number(i.meters) : null;
+        const meters =
+          metersValue !== null ? new Prisma.Decimal(metersValue) : null;
 
-      if (product.unit === 'METER') {
-        if (metersValue === null) {
-          throw new BadRequestException(`meters is required for product ${product.id}`);
+        if (product.unit === 'METER') {
+          if (metersValue === null) {
+            throw new BadRequestException(
+              `meters is required for product ${product.id}`,
+            );
+          }
+          if (metersValue <= 0) {
+            throw new BadRequestException(
+              `meters must be > 0 for product ${product.id}`,
+            );
+          }
+          if (i.quantity !== 1) {
+            throw new BadRequestException(
+              `quantity must be 1 for meter-based product ${product.id}`,
+            );
+          }
+        } else {
+          if (metersValue !== null) {
+            throw new BadRequestException(
+              `meters is not allowed for product ${product.id}`,
+            );
+          }
         }
-        if (metersValue <= 0) {
-          throw new BadRequestException(`meters must be > 0 for product ${product.id}`);
+
+        const units = product.unit === 'METER' ? meters! : qty;
+        const pricePerUnit = product.price;
+        const total = pricePerUnit.mul(units);
+        subtotal = subtotal.add(total);
+
+        const colors = product.colors;
+        if (colors.length > 0 && (!i.color || !colors.includes(i.color))) {
+          throw new BadRequestException(
+            `Invalid color for product ${product.id}`,
+          );
         }
-        if (i.quantity !== 1) {
-          throw new BadRequestException(`quantity must be 1 for meter-based product ${product.id}`);
+
+        const sizes = product.sizes;
+        if (
+          product.unit === 'PIECE' &&
+          sizes.length > 0 &&
+          (!i.size || !sizes.includes(i.size))
+        ) {
+          throw new BadRequestException(
+            `Invalid size for product ${product.id}`,
+          );
         }
-      } else {
-        if (metersValue !== null) {
-          throw new BadRequestException(`meters is not allowed for product ${product.id}`);
-        }
-      }
 
-      const units = product.unit === 'METER' ? meters! : qty;
-      const pricePerUnit = product.price;
-      const total = pricePerUnit.mul(units);
-      subtotal = subtotal.add(total);
-
-      const colors = product.colors;
-      if (colors.length > 0 && (!i.color || !colors.includes(i.color))) {
-        throw new BadRequestException(`Invalid color for product ${product.id}`);
-      }
-
-      const sizes = product.sizes;
-      if (product.unit === 'PIECE' && sizes.length > 0 && (!i.size || !sizes.includes(i.size))) {
-        throw new BadRequestException(`Invalid size for product ${product.id}`);
-      }
-
-      return {
-        product: { connect: { id: product.id } },
-        productName: { ru: product.nameRu, uz: product.nameUz, en: product.nameEn },
-        productImage: product.images[0] ?? '',
-        quantity: i.quantity,
-        meters,
-        size: i.size,
-        color: i.color,
-        pricePerUnit,
-        total,
-      };
-    });
+        return {
+          product: { connect: { id: product.id } },
+          productName: {
+            ru: product.nameRu,
+            uz: product.nameUz,
+            en: product.nameEn,
+          },
+          productImage: product.images[0] ?? '',
+          quantity: i.quantity,
+          meters,
+          size: i.size,
+          color: i.color,
+          pricePerUnit,
+          total,
+        };
+      },
+    );
 
     const deliveryFee = new Prisma.Decimal(0);
     const total = subtotal.add(deliveryFee);
@@ -102,10 +135,20 @@ export class OrdersService {
         customerPhone: dto.customerPhone,
         customerEmail: dto.customerEmail,
         deliveryType: dto.deliveryType,
-        branchKey: dto.deliveryType === DeliveryType.PICKUP ? dto.branchKey : null,
-        branchName: dto.deliveryType === DeliveryType.PICKUP ? shop?.cityRu ?? null : null,
-        branchAddress: dto.deliveryType === DeliveryType.PICKUP ? shop?.addressRu ?? null : null,
-        deliveryAddress: dto.deliveryType === DeliveryType.DELIVERY ? dto.deliveryAddress : null,
+        branchKey:
+          dto.deliveryType === DeliveryType.PICKUP ? dto.branchKey : null,
+        branchName:
+          dto.deliveryType === DeliveryType.PICKUP
+            ? (shop?.cityRu ?? null)
+            : null,
+        branchAddress:
+          dto.deliveryType === DeliveryType.PICKUP
+            ? (shop?.addressRu ?? null)
+            : null,
+        deliveryAddress:
+          dto.deliveryType === DeliveryType.DELIVERY
+            ? dto.deliveryAddress
+            : null,
         paymentMethod: dto.paymentMethod,
         subtotal,
         deliveryFee,
@@ -164,7 +207,10 @@ export class OrdersService {
 
     const orders = await this.prisma.order.findMany({
       where,
-      include: { items: true, user: { select: { id: true, email: true, role: true } } },
+      include: {
+        items: true,
+        user: { select: { id: true, email: true, role: true } },
+      },
       orderBy: { createdAt: 'desc' },
       skip: filter.skip ?? 0,
       take: filter.take ?? 50,
@@ -176,14 +222,24 @@ export class OrdersService {
   async adminGet(id: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
-      include: { items: true, user: { select: { id: true, email: true, role: true } } },
+      include: {
+        items: true,
+        user: { select: { id: true, email: true, role: true } },
+      },
     });
     if (!order) throw new NotFoundException('Order not found');
     return this.toAdminDto(order);
   }
 
-  async adminUpdateStatus(id: string, status: OrderStatus, adminNotes?: string) {
-    const exists = await this.prisma.order.findUnique({ where: { id }, select: { id: true } });
+  async adminUpdateStatus(
+    id: string,
+    status: OrderStatus,
+    adminNotes?: string,
+  ) {
+    const exists = await this.prisma.order.findUnique({
+      where: { id },
+      select: { id: true },
+    });
     if (!exists) throw new NotFoundException('Order not found');
 
     await this.prisma.order.update({
@@ -198,8 +254,15 @@ export class OrdersService {
     return this.adminGet(id);
   }
 
-  async adminUpdatePaymentStatus(id: string, paymentStatus: PaymentStatus, adminNotes?: string) {
-    const exists = await this.prisma.order.findUnique({ where: { id }, select: { id: true } });
+  async adminUpdatePaymentStatus(
+    id: string,
+    paymentStatus: PaymentStatus,
+    adminNotes?: string,
+  ) {
+    const exists = await this.prisma.order.findUnique({
+      where: { id },
+      select: { id: true },
+    });
     if (!exists) throw new NotFoundException('Order not found');
 
     await this.prisma.order.update({
@@ -245,7 +308,12 @@ export class OrdersService {
   }
 
   private toAdminDto(
-    order: Prisma.OrderGetPayload<{ include: { items: true; user: { select: { id: true; email: true; role: true } } } }>,
+    order: Prisma.OrderGetPayload<{
+      include: {
+        items: true;
+        user: { select: { id: true; email: true; role: true } };
+      };
+    }>,
   ) {
     return {
       ...this.toDto(order),

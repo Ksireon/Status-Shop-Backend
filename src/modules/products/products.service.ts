@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, ProductUnit } from '@prisma/client';
 import { decimalToNumber } from '../../common/prisma/decimal';
 import { PrismaService } from '../prisma/prisma.service';
@@ -27,8 +31,12 @@ export class ProductsService {
       ...(filter.minPrice !== undefined || filter.maxPrice !== undefined
         ? {
             price: {
-              ...(filter.minPrice !== undefined ? { gte: new Prisma.Decimal(filter.minPrice) } : {}),
-              ...(filter.maxPrice !== undefined ? { lte: new Prisma.Decimal(filter.maxPrice) } : {}),
+              ...(filter.minPrice !== undefined
+                ? { gte: new Prisma.Decimal(filter.minPrice) }
+                : {}),
+              ...(filter.maxPrice !== undefined
+                ? { lte: new Prisma.Decimal(filter.maxPrice) }
+                : {}),
             },
           }
         : {}),
@@ -104,8 +112,12 @@ export class ProductsService {
       ...(filter.minPrice !== undefined || filter.maxPrice !== undefined
         ? {
             price: {
-              ...(filter.minPrice !== undefined ? { gte: new Prisma.Decimal(filter.minPrice) } : {}),
-              ...(filter.maxPrice !== undefined ? { lte: new Prisma.Decimal(filter.maxPrice) } : {}),
+              ...(filter.minPrice !== undefined
+                ? { gte: new Prisma.Decimal(filter.minPrice) }
+                : {}),
+              ...(filter.maxPrice !== undefined
+                ? { lte: new Prisma.Decimal(filter.maxPrice) }
+                : {}),
             },
           }
         : {}),
@@ -175,10 +187,14 @@ export class ProductsService {
   }
 
   async adminCreate(dto: CreateProductDto) {
-    const category = await this.prisma.category.findUnique({ where: { key: dto.categoryKey } });
+    const category = await this.prisma.category.findUnique({
+      where: { key: dto.categoryKey },
+    });
     if (!category) throw new BadRequestException('Invalid categoryKey');
     if (dto.unit === ProductUnit.METER && (dto.sizes ?? []).length > 0) {
-      throw new BadRequestException('sizes is not allowed for meter-based product');
+      throw new BadRequestException(
+        'sizes is not allowed for meter-based product',
+      );
     }
 
     const p = await this.prisma.product.create({
@@ -195,7 +211,9 @@ export class ProductsService {
         images: dto.images ?? [],
         sizes: dto.sizes ?? [],
         colors: dto.colors ?? [],
-        characteristics: dto.characteristics ? (dto.characteristics as Prisma.InputJsonValue) : undefined,
+        characteristics: dto.characteristics
+          ? (dto.characteristics as Prisma.InputJsonValue)
+          : undefined,
         stock: dto.stock ?? 0,
         isActive: dto.isActive ?? true,
         isFeatured: dto.isFeatured ?? false,
@@ -209,19 +227,30 @@ export class ProductsService {
   }
 
   async adminUpdate(id: string, dto: UpdateProductDto) {
-    const exists = await this.prisma.product.findUnique({ where: { id }, select: { id: true, unit: true, sizes: true } });
+    const exists = await this.prisma.product.findUnique({
+      where: { id },
+      select: { id: true, unit: true, sizes: true },
+    });
     if (!exists) throw new NotFoundException('Product not found');
 
     const nextUnit = dto.unit ?? exists.unit;
     const nextSizes = dto.sizes ?? exists.sizes;
     if (nextUnit === ProductUnit.METER && nextSizes.length > 0) {
-      throw new BadRequestException('sizes is not allowed for meter-based product');
+      throw new BadRequestException(
+        'sizes is not allowed for meter-based product',
+      );
     }
 
     const categoryId = dto.categoryKey
-      ? (await this.prisma.category.findUnique({ where: { key: dto.categoryKey }, select: { id: true } }))?.id
+      ? (
+          await this.prisma.category.findUnique({
+            where: { key: dto.categoryKey },
+            select: { id: true },
+          })
+        )?.id
       : undefined;
-    if (dto.categoryKey && !categoryId) throw new BadRequestException('Invalid categoryKey');
+    if (dto.categoryKey && !categoryId)
+      throw new BadRequestException('Invalid categoryKey');
 
     await this.prisma.product.update({
       where: { id },
@@ -234,11 +263,14 @@ export class ProductsService {
         descRu: dto.descRu,
         descUz: dto.descUz,
         descEn: dto.descEn,
-        price: dto.price !== undefined ? new Prisma.Decimal(dto.price) : undefined,
+        price:
+          dto.price !== undefined ? new Prisma.Decimal(dto.price) : undefined,
         images: dto.images,
         sizes: dto.sizes,
         colors: dto.colors,
-        characteristics: dto.characteristics ? (dto.characteristics as Prisma.InputJsonValue) : undefined,
+        characteristics: dto.characteristics
+          ? (dto.characteristics as Prisma.InputJsonValue)
+          : undefined,
         stock: dto.stock,
         isActive: dto.isActive,
         isFeatured: dto.isFeatured,
@@ -251,9 +283,15 @@ export class ProductsService {
   }
 
   async adminDelete(id: string) {
-    const exists = await this.prisma.product.findUnique({ where: { id }, select: { id: true } });
+    const exists = await this.prisma.product.findUnique({
+      where: { id },
+      select: { id: true },
+    });
     if (!exists) throw new NotFoundException('Product not found');
-    await this.prisma.product.update({ where: { id }, data: { isActive: false } });
+    await this.prisma.product.update({
+      where: { id },
+      data: { isActive: false },
+    });
     return { ok: true };
   }
 }

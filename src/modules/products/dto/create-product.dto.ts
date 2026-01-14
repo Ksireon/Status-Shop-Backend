@@ -99,4 +99,3 @@ export class CreateProductDto {
   @Min(0)
   sortOrder?: number;
 }
-

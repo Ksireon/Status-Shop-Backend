@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { OrderStatus, UserRole } from '@prisma/client';
 import { Roles } from '../../common/auth/roles.decorator';
@@ -29,19 +38,33 @@ export class OrdersAdminController {
 
   @Patch(':id/status')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async updateStatus(@Param('id') id: string, @Body() dto: UpdateOrderStatusDto) {
+  async updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateOrderStatusDto,
+  ) {
     return this.orders.adminUpdateStatus(id, dto.status, dto.adminNotes);
   }
 
   @Patch(':id/payment')
   @Roles(UserRole.ADMIN)
-  async updatePayment(@Param('id') id: string, @Body() dto: UpdateOrderPaymentDto) {
-    return this.orders.adminUpdatePaymentStatus(id, dto.paymentStatus, dto.adminNotes);
+  async updatePayment(
+    @Param('id') id: string,
+    @Body() dto: UpdateOrderPaymentDto,
+  ) {
+    return this.orders.adminUpdatePaymentStatus(
+      id,
+      dto.paymentStatus,
+      dto.adminNotes,
+    );
   }
 
   @Delete(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async cancel(@Param('id') id: string) {
-    return this.orders.adminUpdateStatus(id, OrderStatus.CANCELLED, 'Cancelled by admin');
+    return this.orders.adminUpdateStatus(
+      id,
+      OrderStatus.CANCELLED,
+      'Cancelled by admin',
+    );
   }
 }

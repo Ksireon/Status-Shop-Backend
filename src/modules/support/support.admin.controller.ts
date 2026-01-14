@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { SupportChatStatus, UserRole } from '@prisma/client';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
@@ -40,14 +50,22 @@ export class SupportAdminController {
   }
 
   @Patch('chats/:chatId')
-  async updateChat(@Param('chatId') chatId: string, @Body() dto: UpdateSupportChatDto) {
+  async updateChat(
+    @Param('chatId') chatId: string,
+    @Body() dto: UpdateSupportChatDto,
+  ) {
     const status: SupportChatStatus | undefined = dto.status;
-    return this.support.adminUpdateChat(chatId, { status, assignedTo: dto.assignedTo });
+    return this.support.adminUpdateChat(chatId, {
+      status,
+      assignedTo: dto.assignedTo,
+    });
   }
 
   @Delete('chats/:chatId')
   @Roles(UserRole.ADMIN, UserRole.SUPPORT)
   async closeChat(@Param('chatId') chatId: string) {
-    return this.support.adminUpdateChat(chatId, { status: SupportChatStatus.CLOSED });
+    return this.support.adminUpdateChat(chatId, {
+      status: SupportChatStatus.CLOSED,
+    });
   }
 }

@@ -13,18 +13,36 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post('register')
-  async register(@Req() req: Request, @Body() dto: RegisterDto): Promise<AuthResponseDto> {
-    return this.auth.register(dto, { ip: req.ip, userAgent: req.headers['user-agent'] });
+  async register(
+    @Req() req: Request,
+    @Body() dto: RegisterDto,
+  ): Promise<AuthResponseDto> {
+    return this.auth.register(dto, {
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
   }
 
   @Post('login')
-  async login(@Req() req: Request, @Body() dto: LoginDto): Promise<AuthResponseDto> {
-    return this.auth.login(dto, { ip: req.ip, userAgent: req.headers['user-agent'] });
+  async login(
+    @Req() req: Request,
+    @Body() dto: LoginDto,
+  ): Promise<AuthResponseDto> {
+    return this.auth.login(dto, {
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
   }
 
   @Post('refresh')
-  async refresh(@Req() req: Request, @Body() dto: RefreshDto): Promise<AuthResponseDto> {
-    return this.auth.refresh(dto.refreshToken, { ip: req.ip, userAgent: req.headers['user-agent'] });
+  async refresh(
+    @Req() req: Request,
+    @Body() dto: RefreshDto,
+  ): Promise<AuthResponseDto> {
+    return this.auth.refresh(dto.refreshToken, {
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
   }
 
   @Post('logout')

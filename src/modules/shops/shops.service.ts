@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { decimalToNumber } from '../../common/prisma/decimal';
 import { PrismaService } from '../prisma/prisma.service';
@@ -69,7 +74,10 @@ export class ShopsService {
   }
 
   async adminCreate(dto: CreateShopDto) {
-    const exists = await this.prisma.shop.findUnique({ where: { key: dto.key }, select: { id: true } });
+    const exists = await this.prisma.shop.findUnique({
+      where: { key: dto.key },
+      select: { id: true },
+    });
     if (exists) throw new ConflictException('Shop key already exists');
 
     const s = await this.prisma.shop.create({
@@ -83,8 +91,14 @@ export class ShopsService {
         addressEn: dto.addressEn,
         phone: dto.phone,
         cardNumber: dto.cardNumber,
-        latitude: dto.latitude !== undefined ? new Prisma.Decimal(dto.latitude) : undefined,
-        longitude: dto.longitude !== undefined ? new Prisma.Decimal(dto.longitude) : undefined,
+        latitude:
+          dto.latitude !== undefined
+            ? new Prisma.Decimal(dto.latitude)
+            : undefined,
+        longitude:
+          dto.longitude !== undefined
+            ? new Prisma.Decimal(dto.longitude)
+            : undefined,
         workHours: dto.workHours,
         isActive: dto.isActive ?? true,
         sortOrder: dto.sortOrder ?? 0,
@@ -96,12 +110,19 @@ export class ShopsService {
   }
 
   async adminUpdate(id: string, dto: UpdateShopDto) {
-    const exists = await this.prisma.shop.findUnique({ where: { id }, select: { id: true, key: true } });
+    const exists = await this.prisma.shop.findUnique({
+      where: { id },
+      select: { id: true, key: true },
+    });
     if (!exists) throw new NotFoundException('Shop not found');
 
     if (dto.key) {
-      const other = await this.prisma.shop.findUnique({ where: { key: dto.key }, select: { id: true } });
-      if (other && other.id !== id) throw new BadRequestException('Shop key already exists');
+      const other = await this.prisma.shop.findUnique({
+        where: { key: dto.key },
+        select: { id: true },
+      });
+      if (other && other.id !== id)
+        throw new BadRequestException('Shop key already exists');
     }
 
     await this.prisma.shop.update({
@@ -116,8 +137,14 @@ export class ShopsService {
         addressEn: dto.addressEn,
         phone: dto.phone,
         cardNumber: dto.cardNumber,
-        latitude: dto.latitude !== undefined ? new Prisma.Decimal(dto.latitude) : undefined,
-        longitude: dto.longitude !== undefined ? new Prisma.Decimal(dto.longitude) : undefined,
+        latitude:
+          dto.latitude !== undefined
+            ? new Prisma.Decimal(dto.latitude)
+            : undefined,
+        longitude:
+          dto.longitude !== undefined
+            ? new Prisma.Decimal(dto.longitude)
+            : undefined,
         workHours: dto.workHours,
         isActive: dto.isActive,
         sortOrder: dto.sortOrder,
@@ -128,7 +155,10 @@ export class ShopsService {
   }
 
   async adminDelete(id: string) {
-    const exists = await this.prisma.shop.findUnique({ where: { id }, select: { id: true } });
+    const exists = await this.prisma.shop.findUnique({
+      where: { id },
+      select: { id: true },
+    });
     if (!exists) throw new NotFoundException('Shop not found');
     await this.prisma.shop.update({ where: { id }, data: { isActive: false } });
     return { ok: true };

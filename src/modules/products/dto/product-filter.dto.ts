@@ -48,4 +48,3 @@ export class ProductFilterDto {
   @Min(1)
   take?: number;
 }
-

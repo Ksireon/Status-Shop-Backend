@@ -1,5 +1,14 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { MessageSender, Prisma, SupportChatStatus, UserRole } from '@prisma/client';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  MessageSender,
+  Prisma,
+  SupportChatStatus,
+  UserRole,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupportChatFilterDto } from './dto/support-chat-filter.dto';
 
@@ -30,7 +39,10 @@ export class SupportService {
 
   async listMyMessages(userId: string) {
     const chat = await this.prisma.supportChat.findFirst({
-      where: { userId, status: { in: [SupportChatStatus.OPEN, SupportChatStatus.IN_PROGRESS] } },
+      where: {
+        userId,
+        status: { in: [SupportChatStatus.OPEN, SupportChatStatus.IN_PROGRESS] },
+      },
       orderBy: { updatedAt: 'desc' },
     });
 
@@ -69,7 +81,17 @@ export class SupportService {
 
     const chats = await this.prisma.supportChat.findMany({
       where,
-      include: { user: { select: { id: true, email: true, name: true, surname: true, phone: true } } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            surname: true,
+            phone: true,
+          },
+        },
+      },
       orderBy: { updatedAt: 'desc' },
       skip: filter.skip ?? 0,
       take: filter.take ?? 50,
@@ -87,7 +109,10 @@ export class SupportService {
   }
 
   async adminListMessages(chatId: string) {
-    const chat = await this.prisma.supportChat.findUnique({ where: { id: chatId }, select: { id: true } });
+    const chat = await this.prisma.supportChat.findUnique({
+      where: { id: chatId },
+      select: { id: true },
+    });
     if (!chat) throw new NotFoundException('Chat not found');
 
     const messages = await this.prisma.supportMessage.findMany({
@@ -105,16 +130,26 @@ export class SupportService {
     }));
   }
 
-  async adminSendSupportMessage(supportUserId: string, chatId: string, text: string) {
-    const chat = await this.prisma.supportChat.findUnique({ where: { id: chatId } });
+  async adminSendSupportMessage(
+    supportUserId: string,
+    chatId: string,
+    text: string,
+  ) {
+    const chat = await this.prisma.supportChat.findUnique({
+      where: { id: chatId },
+    });
     if (!chat) throw new NotFoundException('Chat not found');
 
     const supportUser = await this.prisma.user.findUnique({
       where: { id: supportUserId },
       select: { id: true, role: true, isActive: true },
     });
-    if (!supportUser || !supportUser.isActive) throw new BadRequestException('Invalid support user');
-    if (supportUser.role !== UserRole.SUPPORT && supportUser.role !== UserRole.ADMIN)
+    if (!supportUser || !supportUser.isActive)
+      throw new BadRequestException('Invalid support user');
+    if (
+      supportUser.role !== UserRole.SUPPORT &&
+      supportUser.role !== UserRole.ADMIN
+    )
       throw new BadRequestException('User is not support');
 
     const msg = await this.prisma.supportMessage.create({
@@ -128,7 +163,10 @@ export class SupportService {
 
     await this.prisma.supportChat.update({
       where: { id: chatId },
-      data: { status: SupportChatStatus.IN_PROGRESS, assignedTo: chat.assignedTo ?? supportUserId },
+      data: {
+        status: SupportChatStatus.IN_PROGRESS,
+        assignedTo: chat.assignedTo ?? supportUserId,
+      },
     });
 
     return {
@@ -140,17 +178,30 @@ export class SupportService {
     };
   }
 
-  async adminUpdateChat(chatId: string, patch: { status?: SupportChatStatus; assignedTo?: string }) {
-    const chat = await this.prisma.supportChat.findUnique({ where: { id: chatId } });
+  async adminUpdateChat(
+    chatId: string,
+    patch: { status?: SupportChatStatus; assignedTo?: string },
+  ) {
+    const chat = await this.prisma.supportChat.findUnique({
+      where: { id: chatId },
+    });
     if (!chat) throw new NotFoundException('Chat not found');
 
-    if (patch.assignedTo !== undefined && patch.assignedTo !== null && patch.assignedTo !== '') {
+    if (
+      patch.assignedTo !== undefined &&
+      patch.assignedTo !== null &&
+      patch.assignedTo !== ''
+    ) {
       const supportUser = await this.prisma.user.findUnique({
         where: { id: patch.assignedTo },
         select: { id: true, role: true, isActive: true },
       });
-      if (!supportUser || !supportUser.isActive) throw new BadRequestException('Invalid assignedTo');
-      if (supportUser.role !== UserRole.SUPPORT && supportUser.role !== UserRole.ADMIN)
+      if (!supportUser || !supportUser.isActive)
+        throw new BadRequestException('Invalid assignedTo');
+      if (
+        supportUser.role !== UserRole.SUPPORT &&
+        supportUser.role !== UserRole.ADMIN
+      )
         throw new BadRequestException('assignedTo must be SUPPORT');
     }
 
@@ -159,9 +210,20 @@ export class SupportService {
       data: {
         status: patch.status,
         assignedTo: patch.assignedTo,
-        closedAt: patch.status === SupportChatStatus.CLOSED ? new Date() : undefined,
+        closedAt:
+          patch.status === SupportChatStatus.CLOSED ? new Date() : undefined,
       },
-      include: { user: { select: { id: true, email: true, name: true, surname: true, phone: true } } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            surname: true,
+            phone: true,
+          },
+        },
+      },
     });
 
     return {

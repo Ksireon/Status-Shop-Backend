@@ -1,5 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class UpdateShopDto {
   @ApiPropertyOptional()
@@ -73,4 +80,3 @@ export class UpdateShopDto {
   @Min(0)
   sortOrder?: number;
 }
-

@@ -1,5 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { DeliveryType, OrderStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
+import {
+  DeliveryType,
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+} from '@prisma/client';
 
 export class OrderItemDto {
   @ApiProperty()
@@ -79,4 +84,3 @@ export class OrderDto {
   @ApiProperty()
   createdAt: string;
 }
-

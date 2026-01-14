@@ -22,4 +22,3 @@ export class ShopDto {
   @ApiProperty()
   workHours: string;
 }
-

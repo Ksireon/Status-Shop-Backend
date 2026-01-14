@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtUser } from '../../common/auth/current-user.decorator';
@@ -122,11 +126,18 @@ export class UsersService {
       },
     });
     if (!user) throw new NotFoundException('User not found');
-    return { ...user, createdAt: user.createdAt.toISOString(), updatedAt: user.updatedAt.toISOString() };
+    return {
+      ...user,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
+    };
   }
 
   async adminUpdate(current: JwtUser, id: string, dto: AdminUpdateUserDto) {
-    const exists = await this.prisma.user.findUnique({ where: { id }, select: { id: true } });
+    const exists = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true },
+    });
     if (!exists) throw new NotFoundException('User not found');
 
     if (dto.role !== undefined && current.role !== UserRole.ADMIN) {
@@ -151,9 +162,13 @@ export class UsersService {
   }
 
   async adminCreate(current: JwtUser, dto: AdminCreateUserDto) {
-    if (current.role !== UserRole.ADMIN) throw new BadRequestException('Only ADMIN can create users');
+    if (current.role !== UserRole.ADMIN)
+      throw new BadRequestException('Only ADMIN can create users');
 
-    const exists = await this.prisma.user.findUnique({ where: { email: dto.email }, select: { id: true } });
+    const exists = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+      select: { id: true },
+    });
     if (exists) throw new BadRequestException('Email already exists');
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
@@ -177,7 +192,10 @@ export class UsersService {
   }
 
   async adminDeactivate(id: string) {
-    const exists = await this.prisma.user.findUnique({ where: { id }, select: { id: true } });
+    const exists = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true },
+    });
     if (!exists) throw new NotFoundException('User not found');
     await this.prisma.user.update({ where: { id }, data: { isActive: false } });
     return { ok: true };

@@ -43,4 +43,3 @@ export class AdminUpdateUserDto {
   @IsEnum(UserRole)
   role?: UserRole;
 }
-

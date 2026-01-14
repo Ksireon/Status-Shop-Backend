@@ -29,4 +29,3 @@ export class UserDto {
   @ApiProperty({ enum: UserRole })
   role: UserRole;
 }
-
