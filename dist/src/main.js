@@ -33,5 +33,5 @@ async function bootstrap() {
     swagger_1.SwaggerModule.setup('api/docs', app, document);
     await app.listen(Number(process.env.PORT) || 3000);
 }
-bootstrap();
+void bootstrap();
 //# sourceMappingURL=main.js.map

@@ -45,21 +45,45 @@ let OrdersService = class OrdersService {
         const itemsData = dto.items.map((i) => {
             const product = byId.get(i.productId);
             const qty = new client_1.Prisma.Decimal(i.quantity);
-            const meters = i.meters !== undefined && i.meters !== null ? new client_1.Prisma.Decimal(i.meters) : null;
-            const units = product.type === 'vinil' && meters ? meters : qty;
+            const metersValue = i.meters !== undefined && i.meters !== null ? Number(i.meters) : null;
+            const meters = metersValue !== null ? new client_1.Prisma.Decimal(metersValue) : null;
+            if (product.unit === 'METER') {
+                if (metersValue === null) {
+                    throw new common_1.BadRequestException(`meters is required for product ${product.id}`);
+                }
+                if (metersValue <= 0) {
+                    throw new common_1.BadRequestException(`meters must be > 0 for product ${product.id}`);
+                }
+                if (i.quantity !== 1) {
+                    throw new common_1.BadRequestException(`quantity must be 1 for meter-based product ${product.id}`);
+                }
+            }
+            else {
+                if (metersValue !== null) {
+                    throw new common_1.BadRequestException(`meters is not allowed for product ${product.id}`);
+                }
+            }
+            const units = product.unit === 'METER' ? meters : qty;
             const pricePerUnit = product.price;
             const total = pricePerUnit.mul(units);
             subtotal = subtotal.add(total);
             const colors = product.colors;
-            if (i.color && colors.length > 0 && !colors.includes(i.color)) {
+            if (colors.length > 0 && (!i.color || !colors.includes(i.color))) {
                 throw new common_1.BadRequestException(`Invalid color for product ${product.id}`);
             }
-            if (i.size && product.sizes.length > 0 && !product.sizes.includes(i.size)) {
+            const sizes = product.sizes;
+            if (product.unit === 'PIECE' &&
+                sizes.length > 0 &&
+                (!i.size || !sizes.includes(i.size))) {
                 throw new common_1.BadRequestException(`Invalid size for product ${product.id}`);
             }
             return {
                 product: { connect: { id: product.id } },
-                productName: { ru: product.nameRu, uz: product.nameUz, en: product.nameEn },
+                productName: {
+                    ru: product.nameRu,
+                    uz: product.nameUz,
+                    en: product.nameEn,
+                },
                 productImage: product.images[0] ?? '',
                 quantity: i.quantity,
                 meters,
@@ -81,9 +105,15 @@ let OrdersService = class OrdersService {
                 customerEmail: dto.customerEmail,
                 deliveryType: dto.deliveryType,
                 branchKey: dto.deliveryType === client_1.DeliveryType.PICKUP ? dto.branchKey : null,
-                branchName: dto.deliveryType === client_1.DeliveryType.PICKUP ? shop?.cityRu ?? null : null,
-                branchAddress: dto.deliveryType === client_1.DeliveryType.PICKUP ? shop?.addressRu ?? null : null,
-                deliveryAddress: dto.deliveryType === client_1.DeliveryType.DELIVERY ? dto.deliveryAddress : null,
+                branchName: dto.deliveryType === client_1.DeliveryType.PICKUP
+                    ? (shop?.cityRu ?? null)
+                    : null,
+                branchAddress: dto.deliveryType === client_1.DeliveryType.PICKUP
+                    ? (shop?.addressRu ?? null)
+                    : null,
+                deliveryAddress: dto.deliveryType === client_1.DeliveryType.DELIVERY
+                    ? dto.deliveryAddress
+                    : null,
                 paymentMethod: dto.paymentMethod,
                 subtotal,
                 deliveryFee,
@@ -111,6 +141,86 @@ let OrdersService = class OrdersService {
         if (!order)
             throw new common_1.NotFoundException('Order not found');
         return this.toDto(order);
+    }
+    async adminList(filter) {
+        const where = {
+            ...(filter.status ? { status: filter.status } : {}),
+            ...(filter.paymentStatus ? { paymentStatus: filter.paymentStatus } : {}),
+            ...(filter.q
+                ? {
+                    OR: [
+                        { shortId: { contains: filter.q, mode: 'insensitive' } },
+                        { customerEmail: { contains: filter.q, mode: 'insensitive' } },
+                        { customerPhone: { contains: filter.q, mode: 'insensitive' } },
+                        { customerName: { contains: filter.q, mode: 'insensitive' } },
+                    ],
+                }
+                : {}),
+            ...(filter.dateFrom || filter.dateTo
+                ? {
+                    createdAt: {
+                        ...(filter.dateFrom ? { gte: new Date(filter.dateFrom) } : {}),
+                        ...(filter.dateTo ? { lte: new Date(filter.dateTo) } : {}),
+                    },
+                }
+                : {}),
+        };
+        const orders = await this.prisma.order.findMany({
+            where,
+            include: {
+                items: true,
+                user: { select: { id: true, email: true, role: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+            skip: filter.skip ?? 0,
+            take: filter.take ?? 50,
+        });
+        return orders.map((o) => this.toAdminDto(o));
+    }
+    async adminGet(id) {
+        const order = await this.prisma.order.findUnique({
+            where: { id },
+            include: {
+                items: true,
+                user: { select: { id: true, email: true, role: true } },
+            },
+        });
+        if (!order)
+            throw new common_1.NotFoundException('Order not found');
+        return this.toAdminDto(order);
+    }
+    async adminUpdateStatus(id, status, adminNotes) {
+        const exists = await this.prisma.order.findUnique({
+            where: { id },
+            select: { id: true },
+        });
+        if (!exists)
+            throw new common_1.NotFoundException('Order not found');
+        await this.prisma.order.update({
+            where: { id },
+            data: {
+                status,
+                adminNotes: adminNotes ?? undefined,
+                completedAt: status === client_1.OrderStatus.COMPLETED ? new Date() : undefined,
+            },
+        });
+        return this.adminGet(id);
+    }
+    async adminUpdatePaymentStatus(id, paymentStatus, adminNotes) {
+        const exists = await this.prisma.order.findUnique({
+            where: { id },
+            select: { id: true },
+        });
+        if (!exists)
+            throw new common_1.NotFoundException('Order not found');
+        await this.prisma.order.update({
+            where: { id },
+            data: {
+                paymentStatus,
+                adminNotes: adminNotes ?? undefined,
+            },
+        });
+        return this.adminGet(id);
     }
     toDto(order) {
         return {
@@ -140,6 +250,18 @@ let OrdersService = class OrdersService {
                 total: (0, decimal_1.decimalToNumber)(i.total),
             })),
             createdAt: order.createdAt.toISOString(),
+        };
+    }
+    toAdminDto(order) {
+        return {
+            ...this.toDto(order),
+            user: order.user,
+            paymentStatus: order.paymentStatus,
+            status: order.status,
+            notes: order.notes,
+            adminNotes: order.adminNotes,
+            updatedAt: order.updatedAt.toISOString(),
+            completedAt: order.completedAt ? order.completedAt.toISOString() : null,
         };
     }
     generateShortId() {

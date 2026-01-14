@@ -1,6 +1,7 @@
+import { UserRole } from '@prisma/client';
 export type JwtUser = {
     sub: string;
     email: string;
-    role: string;
+    role: UserRole;
 };
 export declare const CurrentUser: (...dataOrPipes: unknown[]) => ParameterDecorator;

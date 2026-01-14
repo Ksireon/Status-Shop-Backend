@@ -22,7 +22,7 @@ let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(pas
             secretOrKey: config.getOrThrow('JWT_SECRET'),
         });
     }
-    async validate(payload) {
+    validate(payload) {
         return payload;
     }
 };

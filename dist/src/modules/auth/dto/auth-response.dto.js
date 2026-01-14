@@ -13,10 +13,15 @@ exports.AuthResponseDto = void 0;
 const swagger_1 = require("@nestjs/swagger");
 class AuthResponseDto {
     accessToken;
+    refreshToken;
 }
 exports.AuthResponseDto = AuthResponseDto;
 __decorate([
     (0, swagger_1.ApiProperty)(),
     __metadata("design:type", String)
 ], AuthResponseDto.prototype, "accessToken", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)(),
+    __metadata("design:type", String)
+], AuthResponseDto.prototype, "refreshToken", void 0);
 //# sourceMappingURL=auth-response.dto.js.map

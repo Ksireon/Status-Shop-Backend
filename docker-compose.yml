@@ -26,11 +26,12 @@ services:
       PORT: 3000
       NODE_ENV: development
       JWT_SECRET: "change-me-in-production"
-      JWT_EXPIRES_IN: "7d"
+      JWT_ACCESS_EXPIRES_IN: "15m"
+      JWT_REFRESH_EXPIRES_IN: "30d"
+      REFRESH_TOKEN_SECRET: "change-me-in-production"
       DATABASE_URL: "postgresql://postgres:%3F%40K9fGZ8@postgres:5432/status_shop?schema=public"
     depends_on:
       - postgres
 
 volumes:
   postgres_data:
-

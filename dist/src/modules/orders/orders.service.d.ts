@@ -1,5 +1,7 @@
+import { OrderStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { OrderFilterDto } from './dto/order-filter.dto';
 export declare class OrdersService {
     private readonly prisma;
     constructor(prisma: PrismaService);
@@ -99,6 +101,171 @@ export declare class OrdersService {
         }[];
         createdAt: string;
     }>;
+    adminList(filter: OrderFilterDto): Promise<{
+        user: {
+            id: string;
+            email: string;
+            role: import("@prisma/client").$Enums.UserRole;
+        };
+        paymentStatus: import("@prisma/client").$Enums.PaymentStatus;
+        status: import("@prisma/client").$Enums.OrderStatus;
+        notes: string | null;
+        adminNotes: string | null;
+        updatedAt: string;
+        completedAt: string | null;
+        id: string;
+        shortId: string;
+        deliveryType: import("@prisma/client").$Enums.DeliveryType;
+        paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
+        subtotal: number;
+        deliveryFee: number;
+        total: number;
+        branchKey: string | null;
+        branchName: string | null;
+        branchAddress: string | null;
+        deliveryAddress: string | null;
+        items: {
+            id: string;
+            productId: string;
+            productName: {
+                ru: string;
+                uz: string;
+                en: string;
+            };
+            productImage: string;
+            quantity: number;
+            meters: number | null;
+            size: string | null;
+            color: string | null;
+            pricePerUnit: number;
+            total: number;
+        }[];
+        createdAt: string;
+    }[]>;
+    adminGet(id: string): Promise<{
+        user: {
+            id: string;
+            email: string;
+            role: import("@prisma/client").$Enums.UserRole;
+        };
+        paymentStatus: import("@prisma/client").$Enums.PaymentStatus;
+        status: import("@prisma/client").$Enums.OrderStatus;
+        notes: string | null;
+        adminNotes: string | null;
+        updatedAt: string;
+        completedAt: string | null;
+        id: string;
+        shortId: string;
+        deliveryType: import("@prisma/client").$Enums.DeliveryType;
+        paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
+        subtotal: number;
+        deliveryFee: number;
+        total: number;
+        branchKey: string | null;
+        branchName: string | null;
+        branchAddress: string | null;
+        deliveryAddress: string | null;
+        items: {
+            id: string;
+            productId: string;
+            productName: {
+                ru: string;
+                uz: string;
+                en: string;
+            };
+            productImage: string;
+            quantity: number;
+            meters: number | null;
+            size: string | null;
+            color: string | null;
+            pricePerUnit: number;
+            total: number;
+        }[];
+        createdAt: string;
+    }>;
+    adminUpdateStatus(id: string, status: OrderStatus, adminNotes?: string): Promise<{
+        user: {
+            id: string;
+            email: string;
+            role: import("@prisma/client").$Enums.UserRole;
+        };
+        paymentStatus: import("@prisma/client").$Enums.PaymentStatus;
+        status: import("@prisma/client").$Enums.OrderStatus;
+        notes: string | null;
+        adminNotes: string | null;
+        updatedAt: string;
+        completedAt: string | null;
+        id: string;
+        shortId: string;
+        deliveryType: import("@prisma/client").$Enums.DeliveryType;
+        paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
+        subtotal: number;
+        deliveryFee: number;
+        total: number;
+        branchKey: string | null;
+        branchName: string | null;
+        branchAddress: string | null;
+        deliveryAddress: string | null;
+        items: {
+            id: string;
+            productId: string;
+            productName: {
+                ru: string;
+                uz: string;
+                en: string;
+            };
+            productImage: string;
+            quantity: number;
+            meters: number | null;
+            size: string | null;
+            color: string | null;
+            pricePerUnit: number;
+            total: number;
+        }[];
+        createdAt: string;
+    }>;
+    adminUpdatePaymentStatus(id: string, paymentStatus: PaymentStatus, adminNotes?: string): Promise<{
+        user: {
+            id: string;
+            email: string;
+            role: import("@prisma/client").$Enums.UserRole;
+        };
+        paymentStatus: import("@prisma/client").$Enums.PaymentStatus;
+        status: import("@prisma/client").$Enums.OrderStatus;
+        notes: string | null;
+        adminNotes: string | null;
+        updatedAt: string;
+        completedAt: string | null;
+        id: string;
+        shortId: string;
+        deliveryType: import("@prisma/client").$Enums.DeliveryType;
+        paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
+        subtotal: number;
+        deliveryFee: number;
+        total: number;
+        branchKey: string | null;
+        branchName: string | null;
+        branchAddress: string | null;
+        deliveryAddress: string | null;
+        items: {
+            id: string;
+            productId: string;
+            productName: {
+                ru: string;
+                uz: string;
+                en: string;
+            };
+            productImage: string;
+            quantity: number;
+            meters: number | null;
+            size: string | null;
+            color: string | null;
+            pricePerUnit: number;
+            total: number;
+        }[];
+        createdAt: string;
+    }>;
     private toDto;
+    private toAdminDto;
     private generateShortId;
 }

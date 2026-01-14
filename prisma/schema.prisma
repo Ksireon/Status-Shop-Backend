@@ -8,8 +8,14 @@ datasource db {
 
 enum UserRole {
   CUSTOMER
+  MANAGER
   ADMIN
   SUPPORT
+}
+
+enum ProductUnit {
+  PIECE
+  METER
 }
 
 enum DeliveryType {
@@ -71,6 +77,7 @@ model User {
   orders       Order[]
   supportChats SupportChat[]
   supportMessages SupportMessage[]
+  sessions Session[]
 
   @@map("users")
 }
@@ -96,6 +103,7 @@ model Category {
 model Product {
   id   String @id @default(uuid())
   type String
+  unit ProductUnit @default(PIECE)
 
   nameRu String
   nameUz String
@@ -127,8 +135,30 @@ model Product {
 
   @@index([categoryId])
   @@index([type])
+  @@index([unit])
   @@index([isActive])
   @@map("products")
+}
+
+model Session {
+  id String @id @default(uuid())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  refreshTokenHash String @unique
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  replacedBySessionId String?
+
+  ip        String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
 }
 
 model Order {
