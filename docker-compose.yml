@@ -1,0 +1,36 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: status-shop-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "?@K9fGZ8"
+      POSTGRES_DB: status_shop
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: status-shop-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      NODE_ENV: development
+      JWT_SECRET: "change-me-in-production"
+      JWT_EXPIRES_IN: "7d"
+      DATABASE_URL: "postgresql://postgres:%3F%40K9fGZ8@postgres:5432/status_shop?schema=public"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+
