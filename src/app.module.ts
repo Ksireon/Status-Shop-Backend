@@ -16,6 +16,33 @@ import { UsersModule } from './modules/users/users.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      cache: true,
+      validate: (raw: Record<string, unknown>) => {
+        const nodeEnv = getEnvString(raw, 'NODE_ENV') || 'development';
+
+        const databaseUrl = getEnvString(raw, 'DATABASE_URL');
+        if (!databaseUrl) throw new Error('DATABASE_URL is required');
+
+        const jwtSecret = getEnvString(raw, 'JWT_SECRET');
+        if (!jwtSecret) throw new Error('JWT_SECRET is required');
+
+        const refreshSecret = getEnvString(raw, 'REFRESH_TOKEN_SECRET');
+
+        if (nodeEnv === 'production') {
+          const weak = new Set(['change-me-in-production', 'change-me']);
+          if (jwtSecret.length < 32 || weak.has(jwtSecret)) {
+            throw new Error('JWT_SECRET is too weak for production');
+          }
+          if (
+            refreshSecret &&
+            (refreshSecret.length < 32 || weak.has(refreshSecret))
+          ) {
+            throw new Error('REFRESH_TOKEN_SECRET is too weak for production');
+          }
+        }
+
+        return raw;
+      },
     }),
     ThrottlerModule.forRoot([
       {
@@ -36,3 +63,13 @@ import { UsersModule } from './modules/users/users.module';
   providers: [AppService],
 })
 export class AppModule {}
+
+function getEnvString(
+  env: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const v = env[key];
+  if (typeof v !== 'string') return undefined;
+  const t = v.trim();
+  return t.length === 0 ? undefined : t;
+}

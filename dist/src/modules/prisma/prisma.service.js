@@ -14,16 +14,20 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PrismaService = void 0;
 const common_1 = require("@nestjs/common");
+const config_1 = require("@nestjs/config");
 const client_1 = require("@prisma/client");
 const adapter_pg_1 = require("@prisma/adapter-pg");
 const pg_1 = __importDefault(require("pg"));
 let PrismaService = class PrismaService extends client_1.PrismaClient {
     pool;
-    constructor() {
-        const connectionString = process.env.DATABASE_URL;
-        if (!connectionString)
-            throw new Error('DATABASE_URL is required');
-        const pool = new pg_1.default.Pool({ connectionString });
+    constructor(config) {
+        const connectionString = config.getOrThrow('DATABASE_URL');
+        const pool = new pg_1.default.Pool({
+            connectionString,
+            max: Number(config.get('PG_POOL_MAX') || 10),
+            idleTimeoutMillis: Number(config.get('PG_POOL_IDLE_MS') || 30_000),
+            connectionTimeoutMillis: Number(config.get('PG_POOL_CONN_TIMEOUT_MS') || 5_000),
+        });
         super({ adapter: new adapter_pg_1.PrismaPg(pool) });
         this.pool = pool;
     }
@@ -38,6 +42,6 @@ let PrismaService = class PrismaService extends client_1.PrismaClient {
 exports.PrismaService = PrismaService;
 exports.PrismaService = PrismaService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [])
+    __metadata("design:paramtypes", [config_1.ConfigService])
 ], PrismaService);
 //# sourceMappingURL=prisma.service.js.map

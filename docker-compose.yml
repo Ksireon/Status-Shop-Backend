@@ -8,9 +8,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "?@K9fGZ8"
-      POSTGRES_DB: status_shop
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-status_shop}
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -24,12 +24,16 @@ services:
       - "3000:3000"
     environment:
       PORT: 3000
-      NODE_ENV: development
-      JWT_SECRET: "change-me-in-production"
-      JWT_ACCESS_EXPIRES_IN: "15m"
-      JWT_REFRESH_EXPIRES_IN: "30d"
-      REFRESH_TOKEN_SECRET: "change-me-in-production"
-      DATABASE_URL: "postgresql://postgres:%3F%40K9fGZ8@postgres:5432/status_shop?schema=public"
+      NODE_ENV: production
+      TRUST_PROXY: ${TRUST_PROXY:-true}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      RUN_SEED: ${RUN_SEED:-false}
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-30d}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:-}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:change-me@postgres:5432/status_shop?schema=public}
     depends_on:
       - postgres
 

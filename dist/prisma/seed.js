@@ -95,11 +95,46 @@ async function main() {
         city: 'Tashkent',
     });
     const categories = [
-        { key: 'textile', ru: 'Текстиль', uz: 'Tekstil', en: 'Textile', icon: 'checkroom', sortOrder: 1 },
-        { key: 'vinil', ru: 'Термо винил', uz: 'Termo vinil', en: 'Heat vinyl', icon: 'layers', sortOrder: 2 },
-        { key: 'dtf', ru: 'DTF материалы', uz: 'DTF materiallari', en: 'DTF materials', icon: 'print', sortOrder: 3 },
-        { key: 'cups', ru: 'Сублимационные кружки', uz: 'Sublimatsiya krujkalar', en: 'Sublimation mugs', icon: 'coffee', sortOrder: 4 },
-        { key: 'equipment', ru: 'Оборудование', uz: 'Uskunalar', en: 'Equipment', icon: 'precision_manufacturing', sortOrder: 5 },
+        {
+            key: 'textile',
+            ru: 'Текстиль',
+            uz: 'Tekstil',
+            en: 'Textile',
+            icon: 'checkroom',
+            sortOrder: 1,
+        },
+        {
+            key: 'vinil',
+            ru: 'Термо винил',
+            uz: 'Termo vinil',
+            en: 'Heat vinyl',
+            icon: 'layers',
+            sortOrder: 2,
+        },
+        {
+            key: 'dtf',
+            ru: 'DTF материалы',
+            uz: 'DTF materiallari',
+            en: 'DTF materials',
+            icon: 'print',
+            sortOrder: 3,
+        },
+        {
+            key: 'cups',
+            ru: 'Сублимационные кружки',
+            uz: 'Sublimatsiya krujkalar',
+            en: 'Sublimation mugs',
+            icon: 'coffee',
+            sortOrder: 4,
+        },
+        {
+            key: 'equipment',
+            ru: 'Оборудование',
+            uz: 'Uskunalar',
+            en: 'Equipment',
+            icon: 'precision_manufacturing',
+            sortOrder: 5,
+        },
     ];
     for (const c of categories) {
         await prisma.category.upsert({
@@ -167,7 +202,9 @@ async function main() {
             },
         });
     }
-    const textile = await prisma.category.findUnique({ where: { key: 'textile' } });
+    const textile = await prisma.category.findUnique({
+        where: { key: 'textile' },
+    });
     const vinil = await prisma.category.findUnique({ where: { key: 'vinil' } });
     if (textile) {
         await prisma.product.upsert({

@@ -40,4 +40,4 @@ RUN npx prisma generate
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma migrate deploy && npm run prisma:seed && node dist/main"]
+CMD ["sh", "-c", "npx prisma migrate deploy && if [ \"${RUN_SEED}\" = \"true\" ]; then npm run prisma:seed; fi && node dist/main"]

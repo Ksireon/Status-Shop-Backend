@@ -1,4 +1,5 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
@@ -10,11 +11,18 @@ export class PrismaService
 {
   private readonly pool: pg.Pool;
 
-  constructor() {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) throw new Error('DATABASE_URL is required');
-
-    const pool = new pg.Pool({ connectionString });
+  constructor(config: ConfigService) {
+    const connectionString = config.getOrThrow<string>('DATABASE_URL');
+    const pool = new pg.Pool({
+      connectionString,
+      max: Number(config.get<string>('PG_POOL_MAX') || 10),
+      idleTimeoutMillis: Number(
+        config.get<string>('PG_POOL_IDLE_MS') || 30_000,
+      ),
+      connectionTimeoutMillis: Number(
+        config.get<string>('PG_POOL_CONN_TIMEOUT_MS') || 5_000,
+      ),
+    });
     super({ adapter: new PrismaPg(pool) });
     this.pool = pool;
   }
