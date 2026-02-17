@@ -1,0 +1,250 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  MANAGER
+  BRANCH_DIRECTOR
+  OWNER
+  ADMIN
+}
+
+enum DeliveryType {
+  PICKUP
+  DELIVERY
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  DELIVERING
+  COMPLETED
+  CANCELED
+}
+
+enum SupportSender {
+  USER
+  SUPPORT
+  SYSTEM
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(USER)
+  isActive     Boolean  @default(true)
+
+  shopId String? @db.Uuid
+  shop   Shop?   @relation(fields: [shopId], references: [id], onDelete: SetNull)
+
+  name     String?
+  phone    String?
+  city     String?
+  company  String?
+  position String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cartItems       CartItem[]
+  orders          Order[]
+  supportThreads  SupportThread[]
+  supportMessages SupportMessage[]
+
+  @@index([shopId])
+  @@index([role])
+  @@index([isActive])
+}
+
+model Category {
+  id        String   @id @default(uuid()) @db.Uuid
+  slug      String   @unique
+  name      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products Product[]
+}
+
+model Product {
+  id              String   @id @default(uuid()) @db.Uuid
+  categoryId      String?  @db.Uuid
+  category        Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  name            Json
+  description     Json?
+  characteristics Json?
+
+  type            String
+  price           Int
+  isActive        Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  images    ProductImage[]
+  cartItems CartItem[]
+  orderItems OrderItem[]
+
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([type])
+  @@index([price])
+  @@index([createdAt])
+  @@index([categoryId, isActive])
+}
+
+model ProductImage {
+  id        String  @id @default(uuid()) @db.Uuid
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  url   String
+  sort  Int    @default(0)
+  label String?
+
+  createdAt DateTime @default(now())
+
+  @@index([productId, sort])
+}
+
+model CartItem {
+  id        String  @id @default(uuid()) @db.Uuid
+  userId    String  @db.Uuid
+  productId String  @db.Uuid
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  quantity Int @default(1)
+  meters   Int?
+  size     String?
+
+  selectedImageUrl String?
+  colorLabel       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([productId])
+}
+
+model Shop {
+  id        String  @id @default(uuid()) @db.Uuid
+  key       String  @unique
+  name      Json?
+
+  city    String?
+  address String
+  phone   String?
+  hours   String?
+  lat     Float?
+  lng     Float?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+  users  User[]
+
+  @@index([isActive])
+}
+
+model Order {
+  id            String      @id @default(uuid()) @db.Uuid
+  shortId       String      @unique
+  userId        String      @db.Uuid
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status        OrderStatus @default(PENDING)
+  deliveryType  DeliveryType
+  paymentMethod PaymentMethod
+
+  shopId        String? @db.Uuid
+  shop          Shop?   @relation(fields: [shopId], references: [id], onDelete: SetNull)
+  deliveryAddress String?
+
+  total Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items OrderItem[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([shopId])
+  @@index([shopId, createdAt])
+}
+
+model OrderItem {
+  id        String  @id @default(uuid()) @db.Uuid
+  orderId   String  @db.Uuid
+  productId String  @db.Uuid
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  nameSnapshot        Json
+  descriptionSnapshot Json?
+  typeSnapshot        String
+  imageSnapshot       String?
+  colorLabel          String?
+  size                String?
+  meters              Int?
+
+  unitPrice Int
+  quantity  Int
+  lineTotal Int
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+}
+
+model SupportThread {
+  id        String  @id @default(uuid()) @db.Uuid
+  userId    String  @db.Uuid
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isClosed  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages SupportMessage[]
+
+  @@unique([userId])
+  @@index([updatedAt])
+  @@index([isClosed])
+}
+
+model SupportMessage {
+  id        String        @id @default(uuid()) @db.Uuid
+  threadId  String        @db.Uuid
+  userId    String?       @db.Uuid
+  thread    SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user      User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  sender SupportSender
+  text   String
+
+  createdAt DateTime @default(now())
+
+  @@index([threadId])
+  @@index([createdAt])
+}
