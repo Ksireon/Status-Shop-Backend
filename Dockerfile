@@ -19,5 +19,5 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/dist ./dist
 EXPOSE 3000
-HEALTHCHECK --interval=10s --timeout=3s --retries=6 CMD wget -qO- http://localhost:3000/health || exit 1
-CMD ["node", "dist/main.js"]
+HEALTHCHECK --interval=10s --timeout=3s --retries=6 CMD wget -qO- http://localhost:3000/api/health || exit 1
+CMD ["sh", "-c", "npm run prisma:migrate:deploy && node dist/main.js"]
