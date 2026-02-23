@@ -41,6 +41,8 @@ npm run start:dev
 - `DATABASE_URL` — строка подключения к Postgres (рекомендуется `connection_limit=10`).
 - `JWT_ACCESS_SECRET` — секрет для access токенов.
 - `JWT_ACCESS_TTL` — срок жизни access токена.
+- `JWT_REFRESH_SECRET` — секрет для refresh токенов.
+- `JWT_REFRESH_TTL` — срок жизни refresh токена.
 - `CORS_ORIGIN` — список origin через запятую, без `*` для prod.
 - `REDIS_URL` — URL Redis для кеша.
 - `CACHE_TTL` — TTL кеша в секундах.
@@ -49,7 +51,7 @@ npm run start:dev
 
 ## Основные эндпоинты
 
-- Auth: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `GET /api/v1/auth/me`
+- Auth: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`
 - Users: `GET /api/v1/users/me`, `PATCH /api/v1/users/me`
 - Catalog: `GET /api/v1/categories`, `GET /api/v1/products`, `GET /api/v1/products/:id`
 - Cart: `GET /api/v1/cart`, `POST /api/v1/cart/items`, `PATCH /api/v1/cart/items/:id`, `DELETE /api/v1/cart/items/:id`

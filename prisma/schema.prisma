@@ -62,6 +62,7 @@ model User {
   orders          Order[]
   supportThreads  SupportThread[]
   supportMessages SupportMessage[]
+  refreshTokens   RefreshToken[]
 
   @@index([shopId])
   @@index([role])
@@ -139,6 +140,18 @@ model CartItem {
 
   @@index([userId])
   @@index([productId])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Shop {
