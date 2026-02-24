@@ -123,8 +123,9 @@ export class CatalogService {
       description: p.description,
       characteristics: p.characteristics,
       type: p.type,
-      inputMode: productInputMode(p.type),
+      inputMode: productInputMode(p.type, p.category?.slug ?? null),
       price: p.price,
+      stockQuantity: p.stockQuantity,
       primaryImageUrl: primaryImage(p.images),
       images: p.images
         .slice()
@@ -160,8 +161,9 @@ export class CatalogService {
       description: product.description,
       characteristics: product.characteristics,
       type: product.type,
-      inputMode: productInputMode(product.type),
+      inputMode: productInputMode(product.type, product.category?.slug ?? null),
       price: product.price,
+      stockQuantity: product.stockQuantity,
       images: product.images
         .slice()
         .sort((a, b) => a.sort - b.sort)

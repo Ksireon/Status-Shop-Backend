@@ -37,6 +37,12 @@ export class AdminCreateProductDto {
   @Min(0)
   price!: number;
 
+  @ApiPropertyOptional({ example: 10 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  stockQuantity?: number;
+
   @ApiPropertyOptional({ default: true })
   @IsOptional()
   @IsBoolean()

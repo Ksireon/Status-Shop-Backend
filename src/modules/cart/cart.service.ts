@@ -4,15 +4,32 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { productInputMode } from '../../common/utils/product-input-mode';
+import {
+  calcStockUnits,
+  productInputMode,
+} from '../../common/utils/product-input-mode';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 
 function lineTotal(price: number, quantity: number, meters?: number | null) {
-  if (meters && meters > 0) return price * meters;
+  if (meters && meters > 0) return price * meters * quantity;
   return price * quantity;
 }
+
+type CartItemWithProduct = Prisma.CartItemGetPayload<{
+  include: {
+    product: {
+      select: {
+        type: true;
+        stockQuantity: true;
+        isActive: true;
+        category: { select: { slug: true } };
+      };
+    };
+  };
+}>;
 
 @Injectable()
 export class CartService {
@@ -20,9 +37,10 @@ export class CartService {
 
   private validateVariantByType(
     productType: string,
+    categorySlug: string | null,
     data: { meters?: number | null; size?: string | null },
   ) {
-    const mode = productInputMode(productType);
+    const mode = productInputMode(productType, categorySlug);
 
     if (mode.usesMeters) {
       if (data.meters === undefined || data.meters === null) {
@@ -30,16 +48,6 @@ export class CartService {
       }
       if (data.size) {
         throw new BadRequestException('size is not allowed for this product');
-      }
-      return;
-    }
-
-    if (mode.usesSize) {
-      if (!data.size) {
-        throw new BadRequestException('size is required for this product');
-      }
-      if (data.meters !== undefined && data.meters !== null) {
-        throw new BadRequestException('meters is not allowed for this product');
       }
       return;
     }
@@ -67,7 +75,10 @@ export class CartService {
     });
 
     const normalizedItems = items.map((i) => {
-      const inputMode = productInputMode(i.product.type);
+      const inputMode = productInputMode(
+        i.product.type,
+        i.product.category?.slug ?? null,
+      );
       const productImages = i.product.images
         .slice()
         .sort((a, b) => a.sort - b.sort)
@@ -75,6 +86,7 @@ export class CartService {
       const primaryImageUrl = productImages[0]?.url ?? null;
       const selectedImageUrl = i.selectedImageUrl ?? primaryImageUrl;
 
+      const productStock = i.product.stockQuantity;
       const total = lineTotal(i.product.price, i.quantity, i.meters);
 
       return {
@@ -95,6 +107,7 @@ export class CartService {
           type: i.product.type,
           inputMode,
           price: i.product.price,
+          stockQuantity: productStock,
           images: productImages,
         },
         total,
@@ -108,18 +121,31 @@ export class CartService {
   async addItem(userId: string, dto: AddCartItemDto) {
     const product = await this.prisma.product.findFirst({
       where: { id: dto.productId, isActive: true },
-      include: { images: true },
+      include: { images: true, category: { select: { slug: true } } },
     });
     if (!product) throw new NotFoundException('Product not found');
 
-    this.validateVariantByType(product.type, {
+    this.validateVariantByType(product.type, product.category?.slug ?? null, {
       meters: dto.meters,
       size: dto.size,
     });
+    const productStock = product.stockQuantity;
+    if (productStock <= 0) {
+      throw new BadRequestException('Product is out of stock');
+    }
+    const quantity = dto.quantity ?? 1;
+    const requiredUnits = calcStockUnits(
+      product.type,
+      product.category?.slug ?? null,
+      quantity,
+      dto.meters ?? null,
+    );
+    if (requiredUnits > productStock) {
+      throw new BadRequestException('Not enough stock');
+    }
 
     const firstImageUrl =
       product.images.slice().sort((a, b) => a.sort - b.sort)[0]?.url ?? null;
-    const quantity = dto.quantity ?? 1;
 
     await this.prisma.cartItem.create({
       data: {
@@ -137,16 +163,45 @@ export class CartService {
   }
 
   async updateItem(userId: string, itemId: string, dto: UpdateCartItemDto) {
-    const item = await this.prisma.cartItem.findUnique({
+    const item = (await this.prisma.cartItem.findUnique({
       where: { id: itemId },
-      include: { product: { select: { type: true } } },
-    });
+      include: {
+        product: {
+          select: {
+            type: true,
+            stockQuantity: true,
+            category: { select: { slug: true } },
+          },
+        },
+      },
+    })) as CartItemWithProduct | null;
     if (!item) throw new NotFoundException('Cart item not found');
     if (item.userId !== userId) throw new ForbiddenException();
+    if (!item.product.isActive) {
+      throw new BadRequestException('Product is not available');
+    }
 
     const meters = dto.meters ?? item.meters;
     const size = dto.size ?? item.size;
-    this.validateVariantByType(item.product.type, { meters, size });
+    this.validateVariantByType(
+      item.product.type,
+      item.product.category?.slug ?? null,
+      {
+        meters,
+        size,
+      },
+    );
+    const quantity = dto.quantity ?? item.quantity;
+    const itemStock = item.product.stockQuantity;
+    const requiredUnits = calcStockUnits(
+      item.product.type,
+      item.product.category?.slug ?? null,
+      quantity,
+      meters ?? null,
+    );
+    if (requiredUnits > itemStock) {
+      throw new BadRequestException('Not enough stock');
+    }
 
     await this.prisma.cartItem.update({
       where: { id: itemId },

@@ -42,6 +42,12 @@ export class AdminUpdateProductDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsInt()
+  @Min(0)
+  stockQuantity?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 }

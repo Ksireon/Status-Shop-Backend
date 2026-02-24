@@ -134,8 +134,9 @@ export class AdminCatalogService {
           | undefined,
         type: dto.type,
         price: dto.price,
+        stockQuantity: dto.stockQuantity ?? 0,
         isActive: dto.isActive ?? true,
-      },
+      } as Prisma.ProductCreateInput,
       include: { images: true, category: true },
     });
     await this.bumpCatalogVersion();
@@ -177,8 +178,11 @@ export class AdminCatalogService {
           : {}),
         ...(dto.type !== undefined ? { type: dto.type } : {}),
         ...(dto.price !== undefined ? { price: dto.price } : {}),
+        ...(dto.stockQuantity !== undefined
+          ? { stockQuantity: dto.stockQuantity }
+          : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
-      },
+      } as Prisma.ProductUpdateInput,
       include: { images: true, category: true },
     });
     await this.bumpCatalogVersion();

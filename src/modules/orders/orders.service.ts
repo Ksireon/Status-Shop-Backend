@@ -6,6 +6,10 @@ import {
 } from '@nestjs/common';
 import { DeliveryType, OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  calcStockUnits,
+  productInputMode,
+} from '../../common/utils/product-input-mode';
 import { CheckoutDto } from './dto/checkout.dto';
 
 function calcLineTotal(
@@ -13,7 +17,7 @@ function calcLineTotal(
   quantity: number,
   meters?: number | null,
 ) {
-  if (meters && meters > 0) return price * meters;
+  if (meters && meters > 0) return price * meters * quantity;
   return price * quantity;
 }
 
@@ -43,7 +47,7 @@ export class OrdersService {
       const cartItems = await tx.cartItem.findMany({
         where: { userId },
         include: {
-          product: { include: { images: true } },
+          product: { include: { images: true, category: true } },
         },
       });
 
@@ -53,6 +57,26 @@ export class OrdersService {
       const items = cartItems.map((ci) => {
         if (ci.product.name === null) {
           throw new BadRequestException('Invalid product data');
+        }
+        if (!ci.product.isActive) {
+          throw new BadRequestException('Product is not available');
+        }
+        const inputMode = productInputMode(
+          ci.product.type,
+          ci.product.category?.slug ?? null,
+        );
+        if (inputMode.usesMeters && (!ci.meters || ci.meters <= 0)) {
+          throw new BadRequestException('meters is required for this product');
+        }
+        const productStock = ci.product.stockQuantity;
+        const requiredUnits = calcStockUnits(
+          ci.product.type,
+          ci.product.category?.slug ?? null,
+          ci.quantity,
+          ci.meters,
+        );
+        if (requiredUnits > productStock) {
+          throw new BadRequestException('Not enough stock');
         }
         const productImages = ci.product.images
           .slice()
@@ -105,6 +129,37 @@ export class OrdersService {
           shop: true,
         },
       });
+
+      const updateResults = await Promise.all(
+        cartItems.map((ci) => {
+          const inputMode = productInputMode(
+            ci.product.type,
+            ci.product.category?.slug ?? null,
+          );
+          if (inputMode.usesMeters && (!ci.meters || ci.meters <= 0)) {
+            throw new BadRequestException(
+              'meters is required for this product',
+            );
+          }
+          const requiredUnits = calcStockUnits(
+            ci.product.type,
+            ci.product.category?.slug ?? null,
+            ci.quantity,
+            ci.meters,
+          );
+          const where: Prisma.ProductWhereInput = {
+            id: ci.productId,
+            stockQuantity: { gte: requiredUnits },
+          };
+          return tx.product.updateMany({
+            where,
+            data: { stockQuantity: { decrement: requiredUnits } },
+          });
+        }),
+      );
+      if (updateResults.some((res) => res.count === 0)) {
+        throw new BadRequestException('Not enough stock');
+      }
 
       await tx.cartItem.deleteMany({ where: { userId } });
 

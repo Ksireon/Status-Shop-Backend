@@ -14,9 +14,19 @@ async function bootstrap() {
   app.useLogger(app.get(Logger));
   app.enableShutdownHooks();
 
+  const corsOriginEnv = process.env.CORS_ORIGIN;
+  const originList =
+    corsOriginEnv && corsOriginEnv.trim() && corsOriginEnv.trim() !== '*'
+      ? corsOriginEnv
+          .split(',')
+          .map((o) => o.trim())
+          .filter((o) => o.length > 0)
+      : null;
+  const origin = originList && originList.length > 0 ? originList : '*';
+
   app.enableCors({
-    origin: process.env.CORS_ORIGIN?.split(',').map((o) => o.trim()) ?? '*',
-    credentials: process.env.CORS_ORIGIN !== '*',
+    origin,
+    credentials: origin !== '*',
   });
 
   app.use(helmet());

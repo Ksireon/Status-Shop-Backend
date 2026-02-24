@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole } from '@prisma/client';
+import { Prisma, PrismaClient, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -51,6 +51,7 @@ async function main() {
       categoryId: textile.id,
       type: 'textile',
       price: 95000,
+      stockQuantity: 50,
       isActive: true,
       name: {
         ru: 'Футболка Статус',
@@ -69,7 +70,7 @@ async function main() {
       images: {
         create: [{ url: 'https://example.com/images/tshirt.png', sort: 0 }],
       },
-    },
+    } as Prisma.ProductCreateInput,
     update: {},
   });
 
@@ -82,6 +83,7 @@ async function main() {
       categoryId: vinyl.id,
       type: 'vinyl',
       price: 140000,
+      stockQuantity: 80,
       isActive: true,
       name: { ru: 'PU Flex', uz: 'PU Flex', en: 'PU Flex' },
       description: {
@@ -96,7 +98,7 @@ async function main() {
       images: {
         create: [{ url: 'https://example.com/images/pu_1.png', sort: 0 }],
       },
-    },
+    } as Prisma.ProductCreateInput,
     update: {},
   });
 
@@ -109,6 +111,7 @@ async function main() {
       categoryId: accessories.id,
       type: 'bag',
       price: 55000,
+      stockQuantity: 40,
       isActive: true,
       name: { ru: 'ЭКО сумка', uz: 'EKO sumka', en: 'ECO Bag' },
       description: {
@@ -119,7 +122,7 @@ async function main() {
       images: {
         create: [{ url: 'https://example.com/images/eco_bag.png', sort: 0 }],
       },
-    },
+    } as Prisma.ProductCreateInput,
     update: {},
   });
 
