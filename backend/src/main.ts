@@ -6,6 +6,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
@@ -14,9 +15,19 @@ async function bootstrap() {
   app.useLogger(app.get(Logger));
   app.enableShutdownHooks();
 
+  const corsOriginEnv = process.env.CORS_ORIGIN;
+  const originList =
+    corsOriginEnv && corsOriginEnv.trim() && corsOriginEnv.trim() !== '*'
+      ? corsOriginEnv
+          .split(',')
+          .map((o) => o.trim())
+          .filter((o) => o.length > 0)
+      : null;
+  const origin = originList && originList.length > 0 ? originList : '*';
+
   app.enableCors({
-    origin: process.env.CORS_ORIGIN?.split(',').map((o) => o.trim()) ?? '*',
-    credentials: process.env.CORS_ORIGIN !== '*',
+    origin,
+    credentials: origin !== '*',
   });
 
   app.use(helmet());
@@ -31,7 +42,10 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new HttpExceptionFilter());
-  app.useGlobalInterceptors(new ResponseInterceptor());
+  app.useGlobalInterceptors(
+    new LoggingInterceptor(),
+    new ResponseInterceptor(),
+  );
 
   app.setGlobalPrefix('api');
   app.enableVersioning({
