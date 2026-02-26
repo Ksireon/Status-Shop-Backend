@@ -5,39 +5,15 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import type { User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { JwtPayload } from '../../common/types/jwt-payload';
 import { parseDurationSeconds } from '../../common/utils/parse-duration-seconds';
+import { buildAppError } from '../../common/errors/app-error';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-
-type AuthUserRow = {
-  id: string;
-  email: string;
-  passwordHash: string;
-  role: JwtPayload['role'];
-  isActive: boolean;
-  shopId: string | null;
-  name: string | null;
-  phone: string | null;
-  city: string | null;
-  company: string | null;
-  position: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-type RefreshTokenRepo = {
-  findUnique: (args: {
-    where: { tokenHash: string };
-  }) => Promise<{ userId: string; expiresAt: Date } | null>;
-  deleteMany: (args: { where: { tokenHash: string } }) => Promise<unknown>;
-  create: (args: {
-    data: { userId: string; tokenHash: string; expiresAt: Date };
-  }) => Promise<unknown>;
-};
 
 @Injectable()
 export class AuthService {
@@ -50,8 +26,16 @@ export class AuthService {
   async register(dto: RegisterDto) {
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email },
+      select: { id: true },
     });
-    if (existing) throw new ConflictException('Email already registered');
+    if (existing) {
+      throw new ConflictException(
+        buildAppError(
+          'AUTH_EMAIL_ALREADY_REGISTERED',
+          'Email already registered',
+        ),
+      );
+    }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const created = await this.prisma.user.create({
@@ -65,21 +49,26 @@ export class AuthService {
         position: dto.position,
       },
     });
-    const user = created as unknown as AuthUserRow;
 
-    return this.buildAuthResponse(user);
+    return this.buildAuthResponse(created);
   }
 
   async login(dto: LoginDto) {
-    const found = await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
-    const user = found as unknown as AuthUserRow | null;
-    if (!user) throw new UnauthorizedException('Invalid credentials');
-    if (!user.isActive) throw new UnauthorizedException('Invalid credentials');
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException(
+        buildAppError('AUTH_INVALID_CREDENTIALS', 'Invalid credentials'),
+      );
+    }
 
     const ok = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!ok) throw new UnauthorizedException('Invalid credentials');
+    if (!ok) {
+      throw new UnauthorizedException(
+        buildAppError('AUTH_INVALID_CREDENTIALS', 'Invalid credentials'),
+      );
+    }
 
     return this.buildAuthResponse(user);
   }
@@ -92,11 +81,13 @@ export class AuthService {
         secret: refreshSecret,
       });
     } catch {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException(
+        buildAppError('AUTH_REFRESH_INVALID', 'Invalid refresh token'),
+      );
     }
 
     const tokenHash = this.hashToken(refreshToken);
-    const stored = await this.refreshTokens.findUnique({
+    const stored = await this.prisma.refreshToken.findUnique({
       where: { tokenHash },
     });
     if (
@@ -104,24 +95,27 @@ export class AuthService {
       stored.userId !== payload.sub ||
       stored.expiresAt <= new Date()
     ) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException(
+        buildAppError('AUTH_REFRESH_INVALID', 'Invalid refresh token'),
+      );
     }
 
-    const found = await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
     });
-    const user = found as unknown as AuthUserRow | null;
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException(
+        buildAppError('AUTH_REFRESH_INVALID', 'Invalid refresh token'),
+      );
     }
 
-    await this.refreshTokens.deleteMany({ where: { tokenHash } });
+    await this.prisma.refreshToken.deleteMany({ where: { tokenHash } });
     return this.buildAuthResponse(user);
   }
 
   async logout(refreshToken: string) {
     const tokenHash = this.hashToken(refreshToken);
-    await this.refreshTokens.deleteMany({ where: { tokenHash } });
+    await this.prisma.refreshToken.deleteMany({ where: { tokenHash } });
     return { ok: true };
   }
 
@@ -157,7 +151,7 @@ export class AuthService {
     return refreshToken;
   }
 
-  private async buildAuthResponse(user: AuthUserRow) {
+  private async buildAuthResponse(user: User) {
     const accessToken = await this.signAccessToken(
       user.id,
       user.email,
@@ -187,10 +181,5 @@ export class AuthService {
 
   private hashToken(token: string) {
     return createHash('sha256').update(token).digest('hex');
-  }
-
-  private get refreshTokens() {
-    return (this.prisma as unknown as { refreshToken: RefreshTokenRepo })
-      .refreshToken;
   }
 }

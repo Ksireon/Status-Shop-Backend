@@ -15,8 +15,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
-      const payload = exception.getResponse();
-      response.status(status).json({ error: payload });
+      const responseBody = exception.getResponse();
+      const base =
+        typeof responseBody === 'string'
+          ? { message: responseBody }
+          : (responseBody as Record<string, unknown>);
+
+      const error = {
+        statusCode: status,
+        code: (base as { code?: string }).code ?? 'UNKNOWN_ERROR',
+        ...base,
+      };
+
+      response.status(status).json({ error });
       return;
     }
 
@@ -24,6 +35,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     response.status(status).json({
       error: {
         statusCode: status,
+        code: 'INTERNAL_SERVER_ERROR',
         message: 'Internal server error',
       },
     });
