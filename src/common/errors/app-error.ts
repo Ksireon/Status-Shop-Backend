@@ -15,4 +15,3 @@ export function buildAppError(
 
   return details === undefined ? { code, message } : { code, message, details };
 }
-

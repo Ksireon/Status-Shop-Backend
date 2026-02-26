@@ -24,7 +24,7 @@ export function productInputMode(
   if (isVinyl) {
     return {
       usesMeters: true,
-      usesQuantity: true,
+      usesQuantity: false,
       usesSize: false,
       purchaseUnit: 'meter',
     };
@@ -50,7 +50,7 @@ export function calcStockUnits(
   if (mode.usesMeters) {
     const normalizedMeters = meters ?? 0;
     if (normalizedMeters <= 0) return 0;
-    return normalizedQuantity * normalizedMeters;
+    return normalizedMeters;
   }
 
   return normalizedQuantity;

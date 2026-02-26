@@ -57,7 +57,9 @@ export class RolesGuard implements CanActivate {
     if (!user) throw new ForbiddenException();
 
     const userRank = getRoleRank(user.role);
-    const minRequiredRank = Math.min(...required.map((role) => getRoleRank(role)));
+    const minRequiredRank = Math.min(
+      ...required.map((role) => getRoleRank(role)),
+    );
 
     if (userRank < minRequiredRank) throw new ForbiddenException();
     return true;

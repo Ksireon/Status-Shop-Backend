@@ -17,8 +17,8 @@ function calcLineTotal(
   quantity: number,
   meters?: number | null,
 ) {
-  if (meters && meters > 0) return price * meters * quantity;
-  return price * quantity;
+  if (meters && meters > 0) return Math.round(price * meters);
+  return Math.round(price * quantity);
 }
 
 function randomShortId() {
@@ -85,7 +85,7 @@ export class OrdersService {
         const imageSnapshot = ci.selectedImageUrl ?? primaryImageUrl;
 
         const unitPrice = ci.product.price;
-        const quantity = ci.quantity;
+        const quantity = inputMode.usesMeters ? 1 : ci.quantity;
         const lineTotal = calcLineTotal(unitPrice, quantity, ci.meters);
 
         return {

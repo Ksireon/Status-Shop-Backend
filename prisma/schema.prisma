@@ -90,7 +90,7 @@ model Product {
 
   type            String
   price           Int
-  stockQuantity   Int      @default(0)
+  stockQuantity   Float    @default(0)
   isActive        Boolean  @default(true)
 
   createdAt DateTime @default(now())
@@ -131,7 +131,7 @@ model CartItem {
   product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   quantity Int @default(1)
-  meters   Int?
+  meters   Float?
   size     String?
 
   selectedImageUrl String?
@@ -221,7 +221,7 @@ model OrderItem {
   imageSnapshot       String?
   colorLabel          String?
   size                String?
-  meters              Int?
+  meters              Float?
 
   unitPrice Int
   quantity  Int

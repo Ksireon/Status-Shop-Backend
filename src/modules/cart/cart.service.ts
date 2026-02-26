@@ -14,8 +14,8 @@ import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 
 function lineTotal(price: number, quantity: number, meters?: number | null) {
-  if (meters && meters > 0) return price * meters * quantity;
-  return price * quantity;
+  if (meters && meters > 0) return Math.round(price * meters);
+  return Math.round(price * quantity);
 }
 
 type CartItemWithProduct = Prisma.CartItemGetPayload<{
@@ -133,7 +133,11 @@ export class CartService {
     if (productStock <= 0) {
       throw new BadRequestException('Product is out of stock');
     }
-    const quantity = dto.quantity ?? 1;
+    const inputMode = productInputMode(
+      product.type,
+      product.category?.slug ?? null,
+    );
+    const quantity = inputMode.usesMeters ? 1 : (dto.quantity ?? 1);
     const requiredUnits = calcStockUnits(
       product.type,
       product.category?.slug ?? null,
@@ -191,7 +195,11 @@ export class CartService {
         size,
       },
     );
-    const quantity = dto.quantity ?? item.quantity;
+    const inputMode = productInputMode(
+      item.product.type,
+      item.product.category?.slug ?? null,
+    );
+    const quantity = inputMode.usesMeters ? 1 : (dto.quantity ?? item.quantity);
     const itemStock = item.product.stockQuantity;
     const requiredUnits = calcStockUnits(
       item.product.type,
@@ -206,7 +214,7 @@ export class CartService {
     await this.prisma.cartItem.update({
       where: { id: itemId },
       data: {
-        quantity: dto.quantity,
+        quantity,
         meters: dto.meters,
         size: dto.size,
         selectedImageUrl: dto.selectedImageUrl,

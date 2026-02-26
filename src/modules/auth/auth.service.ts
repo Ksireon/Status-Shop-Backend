@@ -141,7 +141,7 @@ export class AuthService {
     });
     const tokenHash = this.hashToken(refreshToken);
     const expiresAt = new Date(Date.now() + refreshTtl * 1000);
-    await this.refreshTokens.create({
+    await this.prisma.refreshToken.create({
       data: {
         userId,
         tokenHash,

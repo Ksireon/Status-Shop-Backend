@@ -10,7 +10,6 @@ function createContext(user: JwtPayload | undefined): ExecutionContext {
     switchToHttp: () => ({
       getRequest: () => ({ user }),
     }),
-    // The guard only relies on handler/class metadata; we stub them with empty functions.
     getHandler: () => ({} as unknown as Function),
     getClass: () => ({} as unknown as Function),
   } as unknown as ExecutionContext;
@@ -48,13 +47,13 @@ describe('RolesGuard', () => {
   it('enforces minimal rank for single role', () => {
     reflector.getAllAndOverride.mockReturnValue([UserRole.MANAGER]);
 
-    const user = {
+    const user: JwtPayload = {
       sub: '1',
       email: 'user@example.com',
       role: UserRole.USER,
-    } satisfies JwtPayload;
-    const manager = { ...user, role: UserRole.MANAGER } as const;
-    const owner = { ...user, role: UserRole.OWNER } as const;
+    };
+    const manager: JwtPayload = { ...user, role: UserRole.MANAGER };
+    const owner: JwtPayload = { ...user, role: UserRole.OWNER };
 
     expect(() => guard.canActivate(createContext(user))).toThrow(
       ForbiddenException,
@@ -66,15 +65,15 @@ describe('RolesGuard', () => {
   it('treats BRANCH_DIRECTOR as higher rank than MANAGER', () => {
     reflector.getAllAndOverride.mockReturnValue([UserRole.BRANCH_DIRECTOR]);
 
-    const base = {
+    const base: JwtPayload = {
       sub: '1',
       email: 'user@example.com',
       role: UserRole.USER,
-    } satisfies JwtPayload;
+    };
 
-    const manager = { ...base, role: UserRole.MANAGER } as const;
-    const director = { ...base, role: UserRole.BRANCH_DIRECTOR } as const;
-    const owner = { ...base, role: UserRole.OWNER } as const;
+    const manager: JwtPayload = { ...base, role: UserRole.MANAGER };
+    const director: JwtPayload = { ...base, role: UserRole.BRANCH_DIRECTOR };
+    const owner: JwtPayload = { ...base, role: UserRole.OWNER };
 
     expect(() => guard.canActivate(createContext(manager))).toThrow(
       ForbiddenException,
@@ -94,5 +93,4 @@ describe('RolesGuard', () => {
 
     expect(guard.canActivate(createContext(admin))).toBe(true);
   });
-}
-
+})

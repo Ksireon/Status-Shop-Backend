@@ -1,6 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import {
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+} from 'class-validator';
 
 export class AddCartItemDto {
   @ApiProperty()
@@ -14,11 +21,11 @@ export class AddCartItemDto {
   @Min(1)
   quantity?: number;
 
-  @ApiPropertyOptional({ description: 'For vinyl (meters), integer for now' })
+  @ApiPropertyOptional({ description: 'For vinyl (meters)' })
   @IsOptional()
   @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
-  @IsInt()
-  @Min(1)
+  @IsNumber({ allowInfinity: false, allowNaN: false })
+  @Min(0.01)
   meters?: number;
 
   @ApiPropertyOptional()
