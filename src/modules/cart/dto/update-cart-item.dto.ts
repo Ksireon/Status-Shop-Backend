@@ -17,8 +17,8 @@ export class UpdateCartItemDto {
   @Transform(({ value }) =>
     value === undefined || value === null ? undefined : Number(value),
   )
-  @IsNumber({ allowInfinity: false, allowNaN: false })
-  @Min(0.01)
+  @IsNumber()
+  @Min(0.1)
   meters?: number;
 
   @ApiPropertyOptional()
