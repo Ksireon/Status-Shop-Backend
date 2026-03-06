@@ -57,6 +57,7 @@ async function bootstrap() {
     .setTitle('Status Shop API')
     .setVersion('1.0.0')
     .addBearerAuth()
+    .addServer('http://64.112.127.107:3000')
     .addServer('/api/v1')
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);

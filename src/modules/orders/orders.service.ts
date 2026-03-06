@@ -130,7 +130,38 @@ export class OrdersService {
         },
       });
 
-      const updateResults = await Promise.all(
+      const stockChecks = await Promise.all(
+        cartItems.map(async (ci) => {
+          const inputMode = productInputMode(
+            ci.product.type,
+            ci.product.category?.slug ?? null,
+          );
+          if (inputMode.usesMeters && (!ci.meters || ci.meters <= 0)) {
+            throw new BadRequestException(
+              'meters is required for this product',
+            );
+          }
+          const requiredUnits = calcStockUnits(
+            ci.product.type,
+            ci.product.category?.slug ?? null,
+            ci.quantity,
+            ci.meters,
+          );
+          const product = await tx.product.findUnique({
+            where: { id: ci.productId },
+            select: { stockQuantity: true },
+          });
+          if (!product || product.stockQuantity < requiredUnits) {
+            return false;
+          }
+          return true;
+        }),
+      );
+      if (stockChecks.some((check) => !check)) {
+        throw new BadRequestException('Not enough stock');
+      }
+
+      await Promise.all(
         cartItems.map((ci) => {
           const inputMode = productInputMode(
             ci.product.type,
@@ -147,19 +178,12 @@ export class OrdersService {
             ci.quantity,
             ci.meters,
           );
-          const where: Prisma.ProductWhereInput = {
-            id: ci.productId,
-            stockQuantity: { gte: requiredUnits },
-          };
-          return tx.product.updateMany({
-            where,
+          return tx.product.update({
+            where: { id: ci.productId },
             data: { stockQuantity: { decrement: requiredUnits } },
           });
         }),
       );
-      if (updateResults.some((res) => res.count === 0)) {
-        throw new BadRequestException('Not enough stock');
-      }
 
       await tx.cartItem.deleteMany({ where: { userId } });
 

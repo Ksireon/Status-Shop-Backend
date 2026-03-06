@@ -174,6 +174,7 @@ export class CartService {
           select: {
             type: true,
             stockQuantity: true,
+            isActive: true,
             category: { select: { slug: true } },
           },
         },
