@@ -15,7 +15,7 @@ export class CheckoutDto {
     description: 'Required for pickup/delivery if selecting a branch',
   })
   @IsOptional()
-  @IsUUID()
+  @IsUUID('all')
   shopId?: string;
 
   @ApiPropertyOptional({ description: 'Required when deliveryType=DELIVERY' })

@@ -11,7 +11,7 @@ import {
 
 export class AddCartItemDto {
   @ApiProperty()
-  @IsUUID()
+  @IsUUID('all')
   productId!: string;
 
   @ApiPropertyOptional({ default: 1 })
