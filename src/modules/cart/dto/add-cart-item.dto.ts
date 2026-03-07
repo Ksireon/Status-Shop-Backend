@@ -5,16 +5,19 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  IsUUID,
+  Matches,
   Min,
 } from 'class-validator';
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export class AddCartItemDto {
   @ApiProperty()
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.toLowerCase().trim() : value,
   )
-  @IsUUID('all')
+  @Matches(UUID_REGEX, { message: 'productId must be a valid UUID' })
   productId!: string;
 
   @ApiPropertyOptional({ default: 1 })

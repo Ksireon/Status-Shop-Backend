@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Logger,
   Param,
   Patch,
   Post,
@@ -21,6 +22,8 @@ import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('cart')
 export class CartController {
+  private readonly logger = new Logger(CartController.name);
+
   constructor(private readonly cart: CartService) {}
 
   @Get()
@@ -30,6 +33,9 @@ export class CartController {
 
   @Post('items')
   add(@CurrentUser() user: JwtPayload, @Body() dto: AddCartItemDto) {
+    this.logger.log(
+      `Adding item to cart - productId: ${dto.productId}, userId: ${user.sub}`,
+    );
     return this.cart.addItem(user.sub, dto);
   }
 
