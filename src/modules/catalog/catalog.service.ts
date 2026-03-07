@@ -10,9 +10,20 @@ import {
 } from '../../common/utils/pagination';
 import { ListProductsQuery } from './dto/list-products.query';
 
+function filterExampleComUrl(url: string | null): string | null {
+  if (!url) return null;
+  if (url.includes('example.com')) return null;
+  return url;
+}
+
 function primaryImage(images: ProductImage[]) {
   if (!images.length) return null;
-  return images.slice().sort((a, b) => a.sort - b.sort)[0]?.url ?? null;
+  const sorted = images.slice().sort((a, b) => a.sort - b.sort);
+  for (const img of sorted) {
+    const url = filterExampleComUrl(img.url);
+    if (url) return url;
+  }
+  return null;
 }
 
 @Injectable()
@@ -130,7 +141,12 @@ export class CatalogService {
       images: p.images
         .slice()
         .sort((a, b) => a.sort - b.sort)
-        .map((i) => ({ url: i.url, sort: i.sort, label: i.label })),
+        .map((i) => ({
+          url: filterExampleComUrl(i.url),
+          sort: i.sort,
+          label: i.label,
+        }))
+        .filter((i) => i.url !== null),
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     }));
@@ -167,7 +183,12 @@ export class CatalogService {
       images: product.images
         .slice()
         .sort((a, b) => a.sort - b.sort)
-        .map((i) => ({ url: i.url, sort: i.sort, label: i.label })),
+        .map((i) => ({
+          url: filterExampleComUrl(i.url),
+          sort: i.sort,
+          label: i.label,
+        }))
+        .filter((i) => i.url !== null),
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
     };

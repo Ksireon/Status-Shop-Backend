@@ -60,6 +60,12 @@ export class CartService {
     }
   }
 
+  private filterExampleComUrls(url: string | null): string | null {
+    if (!url) return null;
+    if (url.includes('example.com')) return null;
+    return url;
+  }
+
   async getCart(userId: string) {
     const items = await this.prisma.cartItem.findMany({
       where: { userId },
@@ -82,9 +88,15 @@ export class CartService {
       const productImages = i.product.images
         .slice()
         .sort((a, b) => a.sort - b.sort)
-        .map((img) => ({ url: img.url, sort: img.sort, label: img.label }));
+        .map((img) => ({
+          url: this.filterExampleComUrls(img.url),
+          sort: img.sort,
+          label: img.label,
+        }))
+        .filter((img) => img.url !== null);
       const primaryImageUrl = productImages[0]?.url ?? null;
-      const selectedImageUrl = i.selectedImageUrl ?? primaryImageUrl;
+      const selectedImageUrl =
+        this.filterExampleComUrls(i.selectedImageUrl) ?? primaryImageUrl;
 
       const productStock = i.product.stockQuantity;
       const total = lineTotal(i.product.price, i.quantity, i.meters);
