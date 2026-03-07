@@ -11,6 +11,9 @@ import {
 
 export class AddCartItemDto {
   @ApiProperty()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.toLowerCase().trim() : value,
+  )
   @IsUUID('all')
   productId!: string;
 
