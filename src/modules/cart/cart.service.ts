@@ -10,13 +10,9 @@ import {
   calcStockUnits,
   productInputMode,
 } from '../../common/utils/product-input-mode';
+import { calcLineTotal } from '../../common/utils/line-total';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
-
-function lineTotal(price: number, quantity: number, meters?: number | null) {
-  if (meters && meters > 0) return Math.round(price * meters);
-  return Math.round(price * quantity);
-}
 
 type CartItemWithProduct = Prisma.CartItemGetPayload<{
   include: {
@@ -99,7 +95,7 @@ export class CartService {
         this.filterExampleComUrls(i.selectedImageUrl) ?? primaryImageUrl;
 
       const productStock = i.product.stockQuantity;
-      const total = lineTotal(i.product.price, i.quantity, i.meters);
+      const total = calcLineTotal(i.product.price, i.quantity, i.meters);
 
       return {
         id: i.id,

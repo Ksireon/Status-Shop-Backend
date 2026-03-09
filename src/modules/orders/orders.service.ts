@@ -10,19 +10,20 @@ import {
   calcStockUnits,
   productInputMode,
 } from '../../common/utils/product-input-mode';
+import { calcLineTotal } from '../../common/utils/line-total';
 import { CheckoutDto } from './dto/checkout.dto';
 
-function calcLineTotal(
-  price: number,
-  quantity: number,
-  meters?: number | null,
-) {
-  if (meters && meters > 0) return Math.round(price * meters);
-  return Math.round(price * quantity);
-}
+const SHORT_ID_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const SHORT_ID_LENGTH = 8;
 
-function randomShortId() {
-  return String(Math.floor(100000 + Math.random() * 900000));
+function randomShortId(): string {
+  let result = '';
+  for (let i = 0; i < SHORT_ID_LENGTH; i += 1) {
+    result += SHORT_ID_ALPHABET.charAt(
+      Math.floor(Math.random() * SHORT_ID_ALPHABET.length),
+    );
+  }
+  return result;
 }
 
 @Injectable()
@@ -130,48 +131,8 @@ export class OrdersService {
         },
       });
 
-      const stockChecks = await Promise.all(
-        cartItems.map(async (ci) => {
-          const inputMode = productInputMode(
-            ci.product.type,
-            ci.product.category?.slug ?? null,
-          );
-          if (inputMode.usesMeters && (!ci.meters || ci.meters <= 0)) {
-            throw new BadRequestException(
-              'meters is required for this product',
-            );
-          }
-          const requiredUnits = calcStockUnits(
-            ci.product.type,
-            ci.product.category?.slug ?? null,
-            ci.quantity,
-            ci.meters,
-          );
-          const product = await tx.product.findUnique({
-            where: { id: ci.productId },
-            select: { stockQuantity: true },
-          });
-          if (!product || product.stockQuantity < requiredUnits) {
-            return false;
-          }
-          return true;
-        }),
-      );
-      if (stockChecks.some((check) => !check)) {
-        throw new BadRequestException('Not enough stock');
-      }
-
       await Promise.all(
         cartItems.map((ci) => {
-          const inputMode = productInputMode(
-            ci.product.type,
-            ci.product.category?.slug ?? null,
-          );
-          if (inputMode.usesMeters && (!ci.meters || ci.meters <= 0)) {
-            throw new BadRequestException(
-              'meters is required for this product',
-            );
-          }
           const requiredUnits = calcStockUnits(
             ci.product.type,
             ci.product.category?.slug ?? null,
@@ -214,7 +175,10 @@ export class OrdersService {
   async cancelMyOrder(userId: string, orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { items: true, shop: true },
+      include: {
+        items: { include: { product: { include: { category: true } } } },
+        shop: true,
+      },
     });
     if (!order) throw new NotFoundException('Order not found');
     if (order.userId !== userId) throw new ForbiddenException();
@@ -222,10 +186,27 @@ export class OrdersService {
       throw new BadRequestException('Only pending orders can be canceled');
     }
 
-    return this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: OrderStatus.CANCELED },
-      include: { items: true, shop: true },
+    return this.prisma.$transaction(async (tx) => {
+      await Promise.all(
+        order.items.map((item) => {
+          const requiredUnits = calcStockUnits(
+            item.typeSnapshot,
+            item.product?.category?.slug ?? null,
+            item.quantity,
+            item.meters,
+          );
+          return tx.product.update({
+            where: { id: item.productId },
+            data: { stockQuantity: { increment: requiredUnits } },
+          });
+        }),
+      );
+
+      return tx.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.CANCELED },
+        include: { items: true, shop: true },
+      });
     });
   }
 }
