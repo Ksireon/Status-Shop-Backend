@@ -68,7 +68,12 @@ async function main() {
         weight: { ru: '180 г/м²', uz: '180 g/m²', en: '180 g/m²' },
       },
       images: {
-        create: [{ url: 'https://example.com/images/tshirt.png', sort: 0 }],
+        create: [
+          { url: 'https://example.com/images/tshirt_white.png', sort: 0, label: 'Белый' },
+          { url: 'https://example.com/images/tshirt_black.png', sort: 1, label: 'Черный' },
+          { url: 'https://example.com/images/tshirt_red.png', sort: 2, label: 'Красный' },
+          { url: 'https://example.com/images/tshirt_blue.png', sort: 3, label: 'Синий' },
+        ],
       },
     } as Prisma.ProductCreateInput,
     update: {},
@@ -96,7 +101,13 @@ async function main() {
         temp: { ru: '150°C', uz: '150°C', en: '150°C' },
       },
       images: {
-        create: [{ url: 'https://example.com/images/pu_1.png', sort: 0 }],
+        create: [
+          { url: 'https://example.com/images/pu_white.png', sort: 0, label: 'Белый' },
+          { url: 'https://example.com/images/pu_black.png', sort: 1, label: 'Черный' },
+          { url: 'https://example.com/images/pu_red.png', sort: 2, label: 'Красный' },
+          { url: 'https://example.com/images/pu_gold.png', sort: 3, label: 'Золотой' },
+          { url: 'https://example.com/images/pu_silver.png', sort: 4, label: 'Серебряный' },
+        ],
       },
     } as Prisma.ProductCreateInput,
     update: {},
@@ -120,7 +131,11 @@ async function main() {
         en: 'Eco-friendly bag made of spunbond — lightweight and durable.',
       },
       images: {
-        create: [{ url: 'https://example.com/images/eco_bag.png', sort: 0 }],
+        create: [
+          { url: 'https://example.com/images/eco_bag_white.png', sort: 0, label: 'Белый' },
+          { url: 'https://example.com/images/eco_bag_black.png', sort: 1, label: 'Черный' },
+          { url: 'https://example.com/images/eco_bag_beige.png', sort: 2, label: 'Бежевый' },
+        ],
       },
     } as Prisma.ProductCreateInput,
     update: {},
