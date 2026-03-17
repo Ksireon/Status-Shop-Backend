@@ -28,7 +28,7 @@ async function main() {
     update: {},
   });
 
-  await prisma.shop.upsert({
+  const mainShop = await prisma.shop.upsert({
     where: { key: 'main' },
     create: {
       key: 'main',
@@ -141,6 +141,53 @@ async function main() {
     update: {},
   });
 
+  // ── Admin Dashboard Users ──────────────────────────────────────────
+  const dashboardUsers: {
+    email: string;
+    password: string;
+    role: UserRole;
+    name: string;
+  }[] = [
+    {
+      email: 'owner@status.uz',
+      password: 'Status_shop_owner123',
+      role: UserRole.OWNER,
+      name: 'Owner',
+    },
+    {
+      email: 'director@status.uz',
+      password: 'Status_shop_director123',
+      role: UserRole.BRANCH_DIRECTOR,
+      name: 'Director',
+    },
+    {
+      email: 'manager@status.uz',
+      password: 'Status_shop_manager123',
+      role: UserRole.MANAGER,
+      name: 'Manager',
+    },
+  ];
+
+  for (const u of dashboardUsers) {
+    const hash = await bcrypt.hash(u.password, 10);
+    await prisma.user.upsert({
+      where: { email: u.email },
+      create: {
+        email: u.email,
+        passwordHash: hash,
+        role: u.role,
+        name: u.name,
+        shopId: mainShop.id,
+      },
+      update: {
+        passwordHash: hash,
+        role: u.role,
+        shopId: mainShop.id,
+      },
+    });
+  }
+
+  // Legacy owner from env vars (kept for backward compatibility)
   const ownerEmail = process.env.OWNER_EMAIL;
   const ownerPassword = process.env.OWNER_PASSWORD;
   if (ownerEmail && ownerPassword) {

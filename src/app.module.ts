@@ -16,6 +16,7 @@ import { CartModule } from './modules/cart/cart.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { ShopsModule } from './modules/shops/shops.module';
 import { SupportModule } from './modules/support/support.module';
+import { AdminDashboardModule } from './modules/dashboard/admin-dashboard.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { SupportModule } from './modules/support/support.module';
     OrdersModule,
     ShopsModule,
     SupportModule,
+    AdminDashboardModule,
   ],
   controllers: [AppController],
   providers: [
