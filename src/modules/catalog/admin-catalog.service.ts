@@ -213,6 +213,25 @@ export class AdminCatalogService {
     return image;
   }
 
+  async uploadProductImage(productId: string, file: any, label?: string) {
+    await this.getProduct(productId);
+    
+    // Generate URL for the uploaded file
+    const baseUrl = process.env.API_URL || 'http://64.112.127.107:3000';
+    const fileUrl = `${baseUrl}/uploads/products/${file.filename}`;
+    
+    const image = await this.prisma.productImage.create({
+      data: {
+        productId,
+        url: fileUrl,
+        sort: 0,
+        label: label || null,
+      },
+    });
+    await this.bumpCatalogVersion();
+    return image;
+  }
+
   async updateProductImage(imageId: string, dto: AdminUpdateProductImageDto) {
     const existing = await this.prisma.productImage.findUnique({
       where: { id: imageId },

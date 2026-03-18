@@ -7,8 +7,11 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -103,6 +106,20 @@ export class AdminCatalogController {
     @Body() dto: AdminCreateProductImageDto,
   ) {
     return this.adminCatalog.addProductImage(id, dto);
+  }
+
+  @Roles(UserRole.BRANCH_DIRECTOR)
+  @Post('products/:id/images/upload')
+  @UseInterceptors(FileInterceptor('image', {
+    dest: './uploads/products',
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  }))
+  uploadProductImage(
+    @Param('id') id: string,
+    @UploadedFile() file: any,
+    @Body('label') label?: string,
+  ) {
+    return this.adminCatalog.uploadProductImage(id, file, label);
   }
 
   @Roles(UserRole.BRANCH_DIRECTOR)
