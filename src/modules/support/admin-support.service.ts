@@ -74,4 +74,13 @@ export class AdminSupportService {
       data: { isClosed: true },
     });
   }
+
+  async getThreadMessages(threadId: string) {
+    const thread = await this.prisma.supportThread.findUnique({
+      where: { id: threadId },
+      include: { messages: { orderBy: { createdAt: 'asc' } } },
+    });
+    if (!thread) throw new NotFoundException('Support thread not found');
+    return thread.messages;
+  }
 }
