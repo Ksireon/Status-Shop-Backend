@@ -216,9 +216,22 @@ export class AdminCatalogService {
   async uploadProductImage(productId: string, file: any, label?: string) {
     await this.getProduct(productId);
     
+    if (!file) {
+      throw new Error('No file uploaded');
+    }
+    
     // Generate URL for the uploaded file
     const baseUrl = process.env.API_URL || 'http://64.112.127.107:3000';
     const fileUrl = `${baseUrl}/uploads/products/${file.filename}`;
+    
+    console.log('Uploading image:', {
+      productId,
+      filename: file.filename,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+      url: fileUrl,
+    });
     
     const image = await this.prisma.productImage.create({
       data: {
@@ -228,6 +241,9 @@ export class AdminCatalogService {
         label: label || null,
       },
     });
+    
+    console.log('Image saved to database:', image);
+    
     await this.bumpCatalogVersion();
     return image;
   }
