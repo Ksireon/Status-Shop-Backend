@@ -12,6 +12,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { productImageStorage } from '../../common/config/multer.config';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -111,15 +112,24 @@ export class AdminCatalogController {
   @Roles(UserRole.BRANCH_DIRECTOR)
   @Post('products/:id/images/upload')
   @UseInterceptors(FileInterceptor('image', {
-    dest: './uploads/products',
+    storage: productImageStorage,
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   }))
-  uploadProductImage(
+  async uploadProductImage(
     @Param('id') id: string,
     @UploadedFile() file: any,
     @Body('label') label?: string,
   ) {
-    return this.adminCatalog.uploadProductImage(id, file, label);
+    console.log('Uploading image for product:', id);
+    console.log('File received:', file);
+    
+    if (!file) {
+      throw new Error('No file uploaded');
+    }
+    
+    const result = await this.adminCatalog.uploadProductImage(id, file, label);
+    console.log('Upload result:', result);
+    return result;
   }
 
   @Roles(UserRole.BRANCH_DIRECTOR)
