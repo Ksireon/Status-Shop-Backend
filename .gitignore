@@ -1,3 +1,12 @@
+# Dependencies
+node_modules
+backend/node_modules
+
+# Build outputs
+dist
+backend/dist
+
+# Environment files
 .env
 .env.*
 !.env.example
@@ -6,6 +15,18 @@ backend/.env
 backend/.env.*
 !backend/.env.example
 
-backend/node_modules
-backend/dist
+# Coverage
+coverage
 backend/coverage
+
+# Logs
+*.log
+
+# TypeScript
+*.tsbuildinfo
+
+# ESLint
+.eslintcache
+
+# OS
+.DS_Store
