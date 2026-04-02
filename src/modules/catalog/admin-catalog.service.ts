@@ -220,9 +220,8 @@ export class AdminCatalogService {
       throw new Error('No file uploaded');
     }
     
-    // Generate URL for the uploaded file
-    const baseUrl = process.env.API_URL || 'http://64.112.127.107:3000';
-    const fileUrl = `${baseUrl}/uploads/products/${file.filename}`;
+    // Generate URL for the uploaded file (относительный URL для работы через proxy)
+    const fileUrl = `/uploads/products/${file.filename}`;
     
     console.log('Uploading image:', {
       productId,

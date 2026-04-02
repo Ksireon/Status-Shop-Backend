@@ -42,9 +42,12 @@ async function createApp() {
       : null;
   const origin = originList && originList.length > 0 ? originList : '*';
 
+  // Включаем credentials всегда для поддержки авторизации через JWT
   app.enableCors({
     origin,
-    credentials: origin !== '*',
+    credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: 'Content-Type, Accept, Authorization',
   });
 
   app.use(helmet());
@@ -119,9 +122,12 @@ if (process.env.NODE_ENV !== 'production' || process.env.LOCAL_DEV) {
         : null;
     const origin = originList && originList.length > 0 ? originList : '*';
 
+    // Включаем credentials всегда для поддержки авторизации через JWT
     app.enableCors({
       origin,
-      credentials: origin !== '*',
+      credentials: true,
+      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+      allowedHeaders: 'Content-Type, Accept, Authorization',
     });
 
     app.use(helmet());

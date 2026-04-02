@@ -18,7 +18,8 @@ export class FileUploadService {
   }
 
   getFileUrl(filename: string): string {
-    const baseUrl = process.env.API_URL || 'http://64.112.127.107:3000';
-    return `${baseUrl}/uploads/products/${filename}`;
+    // Возвращаем относительный URL для работы через proxy
+    // Это решает проблему Mixed Content (HTTPS -> HTTP)
+    return `/uploads/products/${filename}`;
   }
 }

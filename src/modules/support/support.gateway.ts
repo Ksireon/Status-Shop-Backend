@@ -22,12 +22,20 @@ interface JoinThreadPayload {
   threadId: string;
 }
 
+// Получаем CORS origin из переменной окружения
+const corsOriginEnv = process.env.CORS_ORIGIN;
+const corsOriginList =
+  corsOriginEnv && corsOriginEnv.trim() && corsOriginEnv.trim() !== '*'
+    ? corsOriginEnv.split(',').map((o) => o.trim()).filter((o) => o.length > 0)
+    : ['https://status-admin-dashboard.vercel.app', 'http://localhost:3001'];
+
 @Injectable()
 @WebSocketGateway({
   namespace: 'support',
   cors: {
-    origin: '*',
+    origin: corsOriginList,
     credentials: true,
+    methods: ['GET', 'POST'],
   },
 })
 export class SupportGateway implements OnGatewayConnection, OnGatewayDisconnect {
