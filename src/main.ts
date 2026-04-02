@@ -168,7 +168,8 @@ if (process.env.NODE_ENV !== 'production' || process.env.LOCAL_DEV) {
       },
     });
 
-    await app.listen(Number(process.env.PORT ?? 3000));
+    // Bind to 0.0.0.0 to accept connections from outside the container
+    await app.listen(Number(process.env.PORT ?? 3000), '0.0.0.0');
     console.log(`Application is running on: ${await app.getUrl()}`);
   }
   bootstrap();
