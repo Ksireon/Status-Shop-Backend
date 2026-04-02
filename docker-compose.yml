@@ -44,6 +44,7 @@ services:
       CACHE_TTL: ${CACHE_TTL:-60}
       THROTTLE_TTL: ${THROTTLE_TTL:-60}
       THROTTLE_LIMIT: ${THROTTLE_LIMIT:-100}
+      LOCAL_DEV: "true"
     ports:
       - "3000:3000"
     depends_on:
