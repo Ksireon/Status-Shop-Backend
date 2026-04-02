@@ -36,6 +36,7 @@ export class AdminUsersService {
   list(query: AdminListUsersQuery) {
     const { skip, take, page, limit } = normalizePagination(query);
     const where = {
+      role: { not: 'USER' },
       ...(query.role ? { role: query.role } : {}),
       ...(query.shopId ? { shopId: query.shopId } : {}),
       ...(query.q
