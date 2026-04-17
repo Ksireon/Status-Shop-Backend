@@ -137,7 +137,34 @@ export class AdminCatalogService {
       }),
     ]);
 
-    return { data: items, meta: buildPaginationMeta(page, limit, total) };
+    // Add full URL to images
+    const baseUrl = process.env.UPLOADS_BASE_URL || '';
+    
+    console.log('UPLOADS_BASE_URL:', baseUrl);
+    console.log('First product from DB:', items[0] ? {
+      id: items[0].id,
+      name: items[0].name,
+      nameType: typeof items[0].name,
+      images: items[0].images
+    } : 'No items');
+    
+    const itemsWithFullImageUrls = items.map(product => ({
+      ...product,
+      images: product.images.map(image => ({
+        ...image,
+        url: image.url.startsWith('http') ? image.url : 
+             image.url.startsWith('/') ? `${baseUrl}${image.url}` : 
+             `${baseUrl}/uploads/products/${image.url}`,
+      })),
+    }));
+    
+    console.log('First product after URL fix:', itemsWithFullImageUrls[0] ? {
+      id: itemsWithFullImageUrls[0].id,
+      name: itemsWithFullImageUrls[0].name,
+      images: itemsWithFullImageUrls[0].images
+    } : 'No items');
+
+    return { data: itemsWithFullImageUrls, meta: buildPaginationMeta(page, limit, total) };
   }
 
   async getProduct(productId: string) {
@@ -146,7 +173,18 @@ export class AdminCatalogService {
       include: { images: { orderBy: { sort: 'asc' } }, category: true },
     });
     if (!product) throw new NotFoundException('Product not found');
-    return product;
+    
+    // Add full URL to images
+    const baseUrl = process.env.UPLOADS_BASE_URL || '';
+    return {
+      ...product,
+      images: product.images.map(image => ({
+        ...image,
+        url: image.url.startsWith('http') ? image.url : 
+             image.url.startsWith('/') ? `${baseUrl}${image.url}` : 
+             `${baseUrl}/uploads/products/${image.url}`,
+      })),
+    };
   }
 
   async createProduct(dto: AdminCreateProductDto) {
