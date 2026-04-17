@@ -50,7 +50,9 @@ async function createApp() {
     allowedHeaders: 'Content-Type, Accept, Authorization',
   });
 
-  app.use(helmet());
+  app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }));
   app.use(compression());
 
   app.useGlobalPipes(
@@ -130,7 +132,9 @@ if (process.env.NODE_ENV !== 'production' || process.env.LOCAL_DEV) {
       allowedHeaders: 'Content-Type, Accept, Authorization',
     });
 
-    app.use(helmet());
+    app.use(helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }));
     app.use(compression());
 
     app.useGlobalPipes(

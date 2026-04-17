@@ -87,10 +87,43 @@ export class AdminCatalogService {
 
   async listProducts(query: AdminListProductsQuery) {
     const { skip, take, page, limit } = normalizePagination(query);
+    
+    // Build search filter for JSON name fields
+    let searchFilter = {};
+    if (query.search && query.search.trim()) {
+      const searchTerm = query.search.trim();
+      searchFilter = {
+        OR: [
+          // Search in Russian name
+          {
+            name: {
+              path: ['ru'],
+              string_contains: searchTerm,
+            },
+          },
+          // Search in Uzbek name
+          {
+            name: {
+              path: ['uz'],
+              string_contains: searchTerm,
+            },
+          },
+          // Search in English name
+          {
+            name: {
+              path: ['en'],
+              string_contains: searchTerm,
+            },
+          },
+        ],
+      };
+    }
+    
     const where = {
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
       ...(query.type ? { type: query.type } : {}),
       ...(query.isActive !== undefined ? { isActive: query.isActive } : {}),
+      ...searchFilter,
     };
 
     const [total, items] = await this.prisma.$transaction([

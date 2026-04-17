@@ -19,4 +19,9 @@ export class AdminListProductsQuery extends PaginationQuery {
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({ description: 'Search in product name (ru, uz, en)' })
+  @IsOptional()
+  @IsString()
+  search?: string;
 }
