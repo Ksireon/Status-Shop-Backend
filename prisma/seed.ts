@@ -69,10 +69,10 @@ async function main() {
       },
       images: {
         create: [
-          { url: 'https://example.com/images/tshirt_white.png', sort: 0, label: 'Белый' },
-          { url: 'https://example.com/images/tshirt_black.png', sort: 1, label: 'Черный' },
-          { url: 'https://example.com/images/tshirt_red.png', sort: 2, label: 'Красный' },
-          { url: 'https://example.com/images/tshirt_blue.png', sort: 3, label: 'Синий' },
+          { url: 'https://placehold.co/400x400/ffffff/000000?text=White+T-Shirt', sort: 0, label: 'Белый' },
+          { url: 'https://placehold.co/400x400/000000/ffffff?text=Black+T-Shirt', sort: 1, label: 'Черный' },
+          { url: 'https://placehold.co/400x400/ff0000/ffffff?text=Red+T-Shirt', sort: 2, label: 'Красный' },
+          { url: 'https://placehold.co/400x400/0000ff/ffffff?text=Blue+T-Shirt', sort: 3, label: 'Синий' },
         ],
       },
     } as Prisma.ProductCreateInput,
@@ -102,11 +102,11 @@ async function main() {
       },
       images: {
         create: [
-          { url: 'https://example.com/images/pu_white.png', sort: 0, label: 'Белый' },
-          { url: 'https://example.com/images/pu_black.png', sort: 1, label: 'Черный' },
-          { url: 'https://example.com/images/pu_red.png', sort: 2, label: 'Красный' },
-          { url: 'https://example.com/images/pu_gold.png', sort: 3, label: 'Золотой' },
-          { url: 'https://example.com/images/pu_silver.png', sort: 4, label: 'Серебряный' },
+          { url: 'https://placehold.co/400x400/ffffff/000000?text=PU+White', sort: 0, label: 'Белый' },
+          { url: 'https://placehold.co/400x400/000000/ffffff?text=PU+Black', sort: 1, label: 'Черный' },
+          { url: 'https://placehold.co/400x400/ff0000/ffffff?text=PU+Red', sort: 2, label: 'Красный' },
+          { url: 'https://placehold.co/400x400/ffd700/000000?text=PU+Gold', sort: 3, label: 'Золотой' },
+          { url: 'https://placehold.co/400x400/c0c0c0/000000?text=PU+Silver', sort: 4, label: 'Серебряный' },
         ],
       },
     } as Prisma.ProductCreateInput,
@@ -132,9 +132,9 @@ async function main() {
       },
       images: {
         create: [
-          { url: 'https://example.com/images/eco_bag_white.png', sort: 0, label: 'Белый' },
-          { url: 'https://example.com/images/eco_bag_black.png', sort: 1, label: 'Черный' },
-          { url: 'https://example.com/images/eco_bag_beige.png', sort: 2, label: 'Бежевый' },
+          { url: 'https://placehold.co/400x400/ffffff/000000?text=Eco+Bag+White', sort: 0, label: 'Белый' },
+          { url: 'https://placehold.co/400x400/000000/ffffff?text=Eco+Bag+Black', sort: 1, label: 'Черный' },
+          { url: 'https://placehold.co/400x400/f5f5dc/000000?text=Eco+Bag+Beige', sort: 2, label: 'Бежевый' },
         ],
       },
     } as Prisma.ProductCreateInput,
